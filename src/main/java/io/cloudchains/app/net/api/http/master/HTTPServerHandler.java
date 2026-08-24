@@ -58,7 +58,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        LOGGER.log(Level.WARNING, "[http-master] Exception caught on channel", cause);
+        LOGGER.log(Level.WARNING, "[http-master] RPC channel failure.");
 
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
         writeResponse(ctx, httpResponse, null);
@@ -91,18 +91,24 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if (httpHeaders.contains("Authorization")) {
                 String authorization = httpHeaders.get("Authorization");
 
-                if (authorization != null && authorization.toLowerCase().startsWith("basic")) {
-                    String base64Credentials = authorization.substring("Basic".length()).trim();
-                    byte[] credDecoded = Base64.decode(base64Credentials);
-                    String credentials = new String(credDecoded, StandardCharsets.UTF_8);
-                    final String[] values = credentials.split(":", 2);
+                if (authorization != null && authorization.regionMatches(true, 0, "Basic ", 0, "Basic ".length())) {
+                    try {
+                        String base64Credentials = authorization.substring("Basic ".length()).trim();
+                        byte[] credDecoded = Base64.decode(base64Credentials);
+                        String credentials = new String(credDecoded, StandardCharsets.UTF_8);
+                        final String[] values = credentials.split(":", 2);
 
-                    headerUser = values[0];
-                    headerPass = values[1];
+                        if (values.length == 2) {
+                            headerUser = values[0];
+                            headerPass = values[1];
 
-                    if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
-                        successfulAuth = true;
-                        LOGGER.log(Level.FINER, "[http-server-handler] Successful Auth");
+                            if (headerUser.equals(configHelper.getRpcUsername()) && headerPass.equals(configHelper.getRpcPassword())) {
+                                successfulAuth = true;
+                                LOGGER.log(Level.FINER, "[http-master] Successful Auth");
+                            }
+                        }
+                    } catch (RuntimeException ignored) {
+                        LOGGER.log(Level.FINER, "[http-master] Malformed authentication header.");
                     }
                 }
             }
@@ -157,13 +163,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 Preconditions.checkNotNull(jsonReq);
 
-                if (!jsonReq.has("method") || !jsonReq.has("params")) {
-                    ctx.close();
+                if (!jsonReq.has("method")
+                        || !jsonReq.get("method").isJsonPrimitive()
+                        || !jsonReq.getAsJsonPrimitive("method").isString()
+                        || !jsonReq.has("params")
+                        || !jsonReq.get("params").isJsonArray()) {
                     throw new IllegalArgumentException("Bad JSON-RPC request by client.");
                 }
             } catch (Exception e) {
-                LOGGER.log(Level.INFO, "Failed Content: " + content);
-                LOGGER.log(Level.WARNING, "[http-master] Failed to parse JSON-RPC request", e);
+                LOGGER.log(Level.INFO, "[http-master] Failed to parse RPC request content.");
+                LOGGER.log(Level.WARNING, "[http-master] Failed to parse JSON-RPC request.");
                 JsonObject errorParsingJSON = new JsonObject();
                 errorParsingJSON.addProperty("code", -1001);
                 errorParsingJSON.addProperty("message", "Error parsing JSON.");
@@ -184,13 +193,9 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 String method = jsonReq.get("method").getAsString();
                 JsonArray params = jsonReq.get("params").getAsJsonArray();
 
-                LOGGER.log(Level.INFO, "[http-server-handler] RPC CALL: " + method + " PARAMS: " + params.size());
-                for (int i = 0; i < params.size(); i++) {
-                    LOGGER.log(Level.INFO, "[http-server-handler] PARAM " + i + ": " + params.get(i).toString());
-                }
+                LOGGER.log(Level.INFO, "[http-master] RPC request received.");
 
                 response = getResponse(method, params);
-                LOGGER.log(Level.FINER, response.toString());
             } else {
                 ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
                 FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -236,7 +241,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         Thread.sleep(500);
                         instance.reloadConfig();
                     } catch (InterruptedException e) {
-                        LOGGER.log(Level.WARNING, "[http-master] Interrupted during reloadconfig for " + ticker, e);
+                        LOGGER.log(Level.WARNING, "[http-master] Reload configuration interrupted.");
                     }
                 };
                 new Thread(r).start();
@@ -261,7 +266,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 //						instance.reloadConfig();
 //					} catch (Exception e) {
 //						success = false;
-//						e.printStackTrace();
 //					}
 //				}
 //
@@ -319,7 +323,6 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         httpResponse.headers().set(HttpHeaderNames.SERVER, CoinInstance.getVersionString());
 
         LOGGER.log(Level.FINER, "[http-server-handler] Writing response to channel. Keep alive? " + keepAlive);
-        LOGGER.log(Level.FINER, "[http-server-handler] Response content: " + httpResponse.content().toString(CharsetUtil.UTF_8));
         ctx.write(httpResponse);
 
         return keepAlive;
