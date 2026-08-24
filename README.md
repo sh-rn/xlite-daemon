@@ -15,7 +15,9 @@ The Xlite Wallet Backend is a Java-based project that serves as the backend infr
 
 ## Project Overview
 
-Provide a brief description of the Xlite Wallet Backend project. Explain its purpose, key features, and how it fits into the overall Xlite wallet application architecture.
+XLite is a local wallet daemon used by a wallet application and by named
+Blocknet compatibility flows. It owns wallet keys and exposes an authenticated
+JSON-RPC boundary to local clients.
 
 ## Prerequisites
 
@@ -30,7 +32,7 @@ Provide step-by-step instructions on how to set up and run the Xlite Wallet Back
 
 1. Clone the repository:
 ```
-git clone https://github.com/blocknetdx/xlite-daemon
+git clone https://github.com/sh-rn/xlite-daemon
 ```
 2. Build the project:
 ```
@@ -96,15 +98,17 @@ Explain how to use the Xlite Wallet Backend. Provide information on available AP
 
 https://docs.blocknet.org/xlite/access-coin-daemons-via-rpc/
 
-Runtime Environment Variables:
-```
-WALLET_MNEMONIC
-WALLET_PASSWORD
-```
+Secrets are never accepted through environment variables or command-line
+arguments. Passwords and mnemonics are entered through stdin only. The legacy
+argument menu is disabled, and mnemonic export is disabled. Encrypted backup
+and restore is not provided by this patch.
+
+RPC servers bind to loopback only and require the configured local RPC
+credentials. Do not expose the ports beyond the local machine.
 
 Supported RPC calls
 ```
-Calls requiring XRouter calls: getblockhash, getblock, gettransaction, sendrawtransaction
+Calls requiring XRouter calls: getblockhash, getblock, gettransaction
 help - This command help.
 stop - Shutdown the server
 =====Blockchain=====
@@ -121,17 +125,29 @@ listunspent - Get all UTXOs in the wallet
 getnewaddress - Generate a new address
 gettransaction <txid> - Get a transaction given its TXID
 getaddressesbyaccount <account> - Get addresses belonging to a given account. The only account available is 'main' which contains all addresses
-importprivkey <privkey> - Import an address given it's privkey
-dumpprivkey <address> - Dump an addresses private key
+importprivkey <privkey> - Import a key for local administrator recovery (not persistent; never expose remotely)
+dumpprivkey <address> - Export a key for local administrator backup (protect the output as wallet secret material)
 =====Utilities=====
 signmessage <address> <message> - Sign a message with a given address' private key
 verifymessage <address> <signature> <message> - Verify a signature for a message signed by a given address
 =====Raw Transactions=====
 createrawtransaction <inputs> <outputs> - Create a raw transaction given inputs and outputs in JSON format. For more info, run createrawtransaction with no arguments.
 decoderawtransaction <rawtx> - Get a raw transaction's JSON representation
-signrawtransaction <rawtx> - Sign a raw transaction
-sendrawtransaction <rawtx> - Broadcast a signed raw transaction to the network
+signrawtransaction <rawtx> - Unavailable until an intent-bound Unified adapter is present
+sendrawtransaction <rawtx> - Unavailable until an intent-bound Unified adapter is present
 ```
+
+The advanced `importprivkey` and `dumpprivkey` methods are retained as
+authenticated local wallet-administrator operations for backup and recovery.
+They return or accept raw private-key material and must never be exposed to a
+renderer or an unrestricted RPC proxy. `sendtransaction` is not available.
+`signmessage` is restricted to an exact wallet-owned self-address proof or a
+canonical Core `UtxoEntry` proof bound to an unspent wallet-owned output. The
+canonical proof is `<lowercase-64-hex-txid>:<uint32-vout>:<Core-default-float-amount>:<same-address>`;
+uppercase transaction IDs are rejected rather than normalised, and Core's
+two-digit exponent form is required at exponent boundaries (for example,
+`1e-05` and `1e+06`). `signrawtransaction` and `sendrawtransaction` fail
+closed with method-not-found until an intent-bound Unified adapter is present.
 
 ## Configuration
 
@@ -159,4 +175,3 @@ Explain how others can contribute to the Xlite Wallet Backend project. Describe 
 ## License
 
 Specify the license under which the Xlite Wallet Backend project is released. Choose an appropriate license that suits your project's requirements. If you're not sure, consult with your team or a legal professional.
-
