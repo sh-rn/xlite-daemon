@@ -200,6 +200,10 @@ public class CoinInstance {
     }
 
     public AddressBalance generateAddress(boolean updateConfig) {
+        if (updateConfig && ConfigHelper.isReadOnlyExistingProfile()) {
+            throw new IllegalStateException(
+                    "Read-only existing-profile mode forbids generating a persisted address.");
+        }
         AddressBalance addressKeyPair = getWalletHelper().generateAddress();
         Address address = addressKeyPair.getAddress();
         DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
@@ -245,7 +249,9 @@ public class CoinInstance {
     public static CoinInstance getInstance(CoinTicker ticker) {
         if (ticker != CoinTicker.BLOCKNET) {
             ConfigHelper cfg = new ConfigHelper(CoinTickerUtils.tickerToString(ticker));
-            if (!cfg.isRpcEnabled()) {
+            if (!cfg.isValidConfiguration() || !cfg.isRpcEnabled()
+                    || ConfigHelper.isReadOnlyExistingProfile()
+                    && (cfg.getRpcPort() < 1 || cfg.getRpcPort() > 65535)) {
                 return null;
             }
         }
@@ -341,15 +347,26 @@ public class CoinInstance {
     }
 
     public CoinError init(String pw, String userMnemonic, boolean isMnemonic) {
-        return init(pw, userMnemonic, isMnemonic, false, true);
+        return init(pw, userMnemonic, isMnemonic, false, true,
+                ConfigHelper.isReadOnlyExistingProfile());
     }
 
     public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
-        return init(pw, userMnemonic, isMnemonic, xliteRPC, true);
+        return init(pw, userMnemonic, isMnemonic, xliteRPC, true,
+                ConfigHelper.isReadOnlyExistingProfile());
     }
 
     public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC,
                           boolean migrateLegacyWallet) {
+        return init(pw, userMnemonic, isMnemonic, xliteRPC, migrateLegacyWallet,
+                ConfigHelper.isReadOnlyExistingProfile());
+    }
+
+    public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC,
+                          boolean migrateLegacyWallet, boolean readOnlyExistingProfile) {
+        readOnlyExistingProfile = readOnlyExistingProfile
+                || ConfigHelper.isReadOnlyExistingProfile();
+        migrateLegacyWallet = migrateLegacyWallet && !readOnlyExistingProfile;
         switch (ticker) {
             case BLOCKNET: {
                 LOGGER.log(Level.FINER, "[coin] Initializing for Blocknet main network.");
@@ -463,6 +480,10 @@ public class CoinInstance {
         }
 
         if (xliteRPC) {
+            if (readOnlyExistingProfile) {
+                return new CoinError("Read-only existing-profile mode forbids RPC port changes",
+                        CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
+            }
             rpcPort = rpcPort + 1;
 
             configHelper.setRpcPort(rpcPort);
@@ -473,6 +494,11 @@ public class CoinInstance {
 
         List<String> baseSeed;
         boolean existsOnDisk = false;
+
+        if (readOnlyExistingProfile && (isMnemonic || userMnemonic != null)) {
+            return new CoinError("Read-only existing-profile mode requires the existing wallet",
+                    CoinError.CoinErrorCode.BADMNEMONIC);
+        }
 
         if (isMnemonic) {
             baseSeed = Arrays.asList(pw.split(" "));
@@ -517,7 +543,7 @@ public class CoinInstance {
 
         // RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
         // This ensures discovery runs once at wallet startup in ANY case
-        if (addressDiscoveryEnabled) {
+        if (addressDiscoveryEnabled && !readOnlyExistingProfile) {
             LOGGER.log(Level.FINER, "[coinAddressDiscoveryService created] Running address discovery");
             runAddressDiscovery();
         } else {
@@ -528,6 +554,10 @@ public class CoinInstance {
         generateForwardAddresses(true);
 
         if (configHelper.getRpcPort() == -1000) {
+            if (readOnlyExistingProfile) {
+                return new CoinError("Read-only existing-profile mode requires a persisted RPC port",
+                        CoinError.CoinErrorCode.UNSUPPORTEDCOIN);
+            }
             configHelper.setRpcPort(rpcPort);
             configHelper.writeConfig();
         } else {
@@ -593,8 +623,13 @@ public class CoinInstance {
         int configAddressCount = configHelper.getAddressCount();
         boolean updateConfig = false;
         if (configAddressCount < FORWARD_ADDRESS_COUNT) { // minimum starting addresses
-            configAddressCount = FORWARD_ADDRESS_COUNT;
-            updateConfig = true;
+            if (ConfigHelper.isReadOnlyExistingProfile()) {
+                LOGGER.log(Level.FINE,
+                        "[wallet] Read-only existing-profile mode preserves persisted address count");
+            } else {
+                configAddressCount = FORWARD_ADDRESS_COUNT;
+                updateConfig = true;
+            }
         }
 
         LOGGER.log(Level.FINER, "[wallet] Generating " + configAddressCount + " forward addresses for network " + getTicker().toString() + ".");
@@ -996,6 +1031,10 @@ public class CoinInstance {
     }
 
     public void reloadConfig() {
+        if (ConfigHelper.isReadOnlyExistingProfile()) {
+            throw new IllegalStateException(
+                    "Read-only existing-profile mode forbids configuration reload.");
+        }
         this.configHelper.loadConfig();
         rpcPort = configHelper.getRpcPort();
         if (configHelper.getAddressCount() != generatedAddressCount)
@@ -1064,6 +1103,10 @@ public class CoinInstance {
     }
 
     public void runAddressDiscovery() {
+        if (ConfigHelper.isReadOnlyExistingProfile()) {
+            LOGGER.log(Level.FINE, "[coin] Read-only existing-profile mode skips address discovery");
+            return;
+        }
         String currency = CoinTickerUtils.tickerToString(this.getTicker());
 
         if (!configHelper.isRpcEnabled()) {

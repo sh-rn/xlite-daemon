@@ -19,6 +19,7 @@ public class ConfigHelper {
     private String tickerStr;
     private File file;
     private FileWriter fileWriter;
+    private boolean validConfiguration;
 
     private double fee;
     private boolean feeFlat;
@@ -30,12 +31,19 @@ public class ConfigHelper {
 
     // Override specific configuration directory (useful in unit tests)
     public static String CONFIG_DIR = ""; // Must not end with [/], e.g. /home/user/.config, not /home/user/.config/
+    private static volatile boolean readOnlyExistingProfile;
+    private static boolean configurationOpened;
 
     public ConfigHelper(String tickerStr) {
+        synchronized (ConfigHelper.class) {
+            configurationOpened = true;
+        }
         this.tickerStr = tickerStr;
 
         try {
-            file = Preconditions.checkNotNull(this.getFile());
+            file = this.getFile();
+            if (file == null)
+                return;
             loadConfig();
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "[config] Failed to initialize config for " + tickerStr, e);
@@ -43,9 +51,16 @@ public class ConfigHelper {
     }
 
     public void loadConfig() {
+        validConfiguration = false;
+        if (file == null)
+            return;
         try {
             String rawConfig = new String(Files.readAllBytes(file.toPath()));
             if (rawConfig.isEmpty()) {
+                if (readOnlyExistingProfile) {
+                    LOGGER.log(Level.WARNING, "[config] Read-only profile has an empty configuration for " + tickerStr);
+                    return;
+                }
                 fee = 0.0001;
                 feeFlat = true;
                 rpcEnabled = false;
@@ -59,6 +74,7 @@ public class ConfigHelper {
                 addressCount = 0;
 
                 writeConfig();
+                validConfiguration = true;
                 return;
             }
 
@@ -77,6 +93,10 @@ public class ConfigHelper {
             for (String configKey : configKeys) {
                 if (!config.has(configKey)) {
                     LOGGER.log(Level.FINER, "[config] Warning: Configuration file does not contain required value '" + configKey + "'. This will probably break things later on.");
+                    if (readOnlyExistingProfile) {
+                        LOGGER.log(Level.WARNING, "[config] Read-only profile is missing required configuration value '" + configKey + "' for " + tickerStr);
+                        return;
+                    }
                 }
             }
 
@@ -93,6 +113,11 @@ public class ConfigHelper {
             } else {
                 addressCount = config.getInt("addressCount");
             }
+            if (readOnlyExistingProfile && addressCount < 0) {
+                LOGGER.log(Level.WARNING, "[config] Read-only profile has a negative address count for " + tickerStr);
+                return;
+            }
+            validConfiguration = true;
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "[config] Error reading config file for " + tickerStr, e);
         }
@@ -105,6 +130,10 @@ public class ConfigHelper {
         File home = new File(userHome);
         File settingsDirectory = new File(home, "settings");
         if (!settingsDirectory.exists()) {
+            if (readOnlyExistingProfile) {
+                LOGGER.log(Level.WARNING, "[config] Read-only profile is missing settings directory for " + tickerStr);
+                return null;
+            }
             if (!settingsDirectory.mkdirs()) {
                 LOGGER.log(Level.FINER, "[config] ERROR: Could not create base/settings directory!");
                 return null;
@@ -112,6 +141,13 @@ public class ConfigHelper {
         }
 
         File configFile = new File(settingsDirectory, "config-" + tickerStr + ".json");
+        if (readOnlyExistingProfile) {
+            if (!configFile.isFile()) {
+                LOGGER.log(Level.WARNING, "[config] Read-only profile is missing configuration for " + tickerStr);
+                return null;
+            }
+            return configFile;
+        }
         try {
             if (!configFile.createNewFile() && !configFile.exists())
                 return null;
@@ -189,11 +225,26 @@ public class ConfigHelper {
         return addressCount;
     }
 
+    /**
+     * Whether this helper loaded a complete configuration file without creating
+     * or repairing it.
+     */
+    public boolean isValidConfiguration() {
+        return validConfiguration;
+    }
+
     public boolean validAuth() {
         return rpcUsername != null && !rpcUsername.equals("") && rpcPassword != null && !rpcPassword.equals("");
     }
 
     public void writeConfig() {
+        if (readOnlyExistingProfile) {
+            throw new IllegalStateException("Read-only existing-profile mode forbids configuration writes.");
+        }
+        if (file == null) {
+            LOGGER.log(Level.WARNING, "[config] Cannot write configuration for " + tickerStr + ": file is unavailable");
+            return;
+        }
         try {
             fileWriter = new FileWriter(file, false);
 
@@ -234,10 +285,29 @@ public class ConfigHelper {
         }
 
         File directory = new File(userHomeDir);
-        if (!directory.exists()) {
+        if (!directory.exists() && !readOnlyExistingProfile) {
             directory.mkdir();
         }
 
         return userHomeDir;
+    }
+
+    /**
+     * Select the process-wide policy before any configuration object is made.
+     * A packaged runtime cannot change this policy after profile configuration
+     * has been opened. The explicit CONFIG_DIR test override remains mutable so
+     * isolated unit tests can reset their process-global fixture state.
+     */
+    public static synchronized void setReadOnlyExistingProfile(boolean readOnly) {
+        if (configurationOpened && CONFIG_DIR.isEmpty()
+                && readOnlyExistingProfile != readOnly) {
+            throw new IllegalStateException(
+                    "Read-only existing-profile policy cannot change after configuration is opened.");
+        }
+        readOnlyExistingProfile = readOnly;
+    }
+
+    public static boolean isReadOnlyExistingProfile() {
+        return readOnlyExistingProfile;
     }
 }

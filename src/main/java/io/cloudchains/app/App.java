@@ -1,14 +1,10 @@
 package io.cloudchains.app;
 
 import io.cloudchains.app.console.ConsoleMenu;
-import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.JSONRPCMasterServer;
 import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
-import io.cloudchains.app.util.CCLogger;
-import io.cloudchains.app.util.ConsoleFormatter;
-import io.cloudchains.app.util.FileFormatter;
-import io.cloudchains.app.util.LogRotationUtil;
+import io.cloudchains.app.util.*;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.io.File;
@@ -31,7 +27,7 @@ public class App {
     public static EXRServerPool exrServerPool = null;
     public static HTTPClient feeUpdateHttpClient = new HTTPClient(2);
     public static HTTPClient heightUpdateHttpClient = new HTTPClient(2);
-    public static JSONRPCMasterServer masterRPC = JSONRPCController.getMasterServer();
+    public static JSONRPCMasterServer masterRPC = null;
     public static ConsoleMenu console = null;
     public static Dotenv dotenv = null;
 
@@ -60,6 +56,8 @@ public class App {
     }
 
     public static void main(String[] args) {
+        ConsoleMenu.configureReadOnlyExistingProfile(args);
+
         for (String arg : args) {
             if (arg.equals("--version")) {
                 System.out.println(Version.CLIENT_VERSION);
@@ -77,12 +75,14 @@ public class App {
         LOGGER.setLevel(Level.INFO);
         LOGGER.setUseParentHandlers(false);
 
-        // Perform log rotation before initializing other components
-        LogRotationUtil.performLogRotation();
+        if (!ConfigHelper.isReadOnlyExistingProfile()) {
+            // Perform log rotation before initializing other components.
+            LogRotationUtil.performLogRotation();
+        }
 
         Runtime.getRuntime().addShutdownHook(new Thread(App::shutdown));
 
-        try {
+        if (!ConfigHelper.isReadOnlyExistingProfile()) try {
             String userHomeDir;
             String OS = (System.getProperty("os.name")).toLowerCase();
 

@@ -35,6 +35,10 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         configHelper = new ConfigHelper("master");
 
         if (configHelper.getRpcUsername().isEmpty() && configHelper.getRpcPassword().isEmpty()) {
+            if (ConfigHelper.isReadOnlyExistingProfile()) {
+                throw new IllegalStateException(
+                        "Read-only existing-profile mode requires master RPC credentials.");
+            }
             configHelper.setRpcUsername(generateRandomString(12));
             configHelper.setRpcPassword(generateRandomString(32));
 
@@ -223,6 +227,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         switch (method.toLowerCase()) {
             case "reloadconfig": {
+                if (ConfigHelper.isReadOnlyExistingProfile()) {
+                    response.add("result", JsonNull.INSTANCE);
+                    JsonObject errorJSON = new JsonObject();
+                    errorJSON.addProperty("code", -32000);
+                    errorJSON.addProperty("message",
+                            "Read-only existing-profile mode forbids configuration reload.");
+                    response.add("error", errorJSON);
+                    break;
+                }
                 if (params.size() != 1) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();

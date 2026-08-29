@@ -6,6 +6,7 @@ import io.cloudchains.app.net.CoinTickerUtils;
 import io.cloudchains.app.net.api.http.client.HTTPClient;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeer;
 import io.cloudchains.app.net.protocols.blocknet.BlocknetPeerGroup;
+import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.LogRotationUtil;
 import io.cloudchains.app.util.XRouterConfiguration;
 
@@ -57,8 +58,9 @@ public class BackgroundTimerThread implements Runnable {
 
         lastOut = 0;
 
-        // Initialize log rotation scheduler
-        initializeLogRotationScheduler();
+        if (!ConfigHelper.isReadOnlyExistingProfile()) {
+            initializeLogRotationScheduler();
+        }
     }
 
     /**
@@ -100,6 +102,9 @@ public class BackgroundTimerThread implements Runnable {
      * Called by the scheduler every 24 hours at 2:00 AM.
      */
     private void performDailyLogRotation() {
+        if (ConfigHelper.isReadOnlyExistingProfile()) {
+            return;
+        }
         try {
             LOGGER.log(Level.INFO, "[BackgroundTimer] Starting scheduled daily log rotation");
             LogRotationUtil.performLogRotation();

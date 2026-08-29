@@ -8,9 +8,16 @@ import java.util.HashMap;
 public class JSONRPCController {
 
     private static final HashMap<CoinInstance, JSONRPCServer> servers = new HashMap<>();
-    private static JSONRPCMasterServer masterServer = new JSONRPCMasterServer(new ConfigHelper("master").getMasterRpcPort());
+    private static JSONRPCMasterServer masterServer;
 
-    public static JSONRPCMasterServer getMasterServer() {
+    public static synchronized JSONRPCMasterServer getMasterServer() {
+        if (masterServer == null) {
+            ConfigHelper config = new ConfigHelper("master");
+            if (!config.isValidConfiguration()) {
+                throw new IllegalStateException("Master RPC configuration is unavailable.");
+            }
+            masterServer = new JSONRPCMasterServer(config.getMasterRpcPort());
+        }
         return masterServer;
     }
 

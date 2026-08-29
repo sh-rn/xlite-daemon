@@ -251,6 +251,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         switch (method.toLowerCase()) {
             case "reloadconfig": {
+                if (ConfigHelper.isReadOnlyExistingProfile()) {
+                    response.add("result", JsonNull.INSTANCE);
+                    JsonObject errorJSON = new JsonObject();
+                    errorJSON.addProperty("code", -32000);
+                    errorJSON.addProperty("message",
+                            "Read-only existing-profile mode forbids configuration reload.");
+                    response.add("error", errorJSON);
+                    break;
+                }
                 Runnable r = () -> {
                     try {
                         Thread.sleep(500);
@@ -1062,6 +1071,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
             case "getnewaddress": {
+                if (ConfigHelper.isReadOnlyExistingProfile()) {
+                    response.add("result", JsonNull.INSTANCE);
+                    JsonObject errorJSON = new JsonObject();
+                    errorJSON.addProperty("code", -32000);
+                    errorJSON.addProperty("message",
+                            "Read-only existing-profile mode forbids creating addresses.");
+                    response.add("error", errorJSON);
+                    break;
+                }
                 if (params.size() != 0) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();

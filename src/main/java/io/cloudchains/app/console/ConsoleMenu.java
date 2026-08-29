@@ -7,6 +7,7 @@ import io.cloudchains.app.crypto.LoginUtils;
 import io.cloudchains.app.net.CoinInstance;
 import io.cloudchains.app.net.CoinTicker;
 import io.cloudchains.app.net.CoinTickerUtils;
+import io.cloudchains.app.net.api.JSONRPCController;
 import io.cloudchains.app.net.api.http.client.EXRServerPool;
 import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.background.BackgroundTimerThread;
@@ -30,18 +31,61 @@ import java.util.stream.Collectors;
 public class ConsoleMenu {
     private static final String NO_MIGRATE_LEGACY_WALLET_FLAG =
             "--no-migrate-legacy-wallet";
+    private static final String READ_ONLY_EXISTING_PROFILE_FLAG =
+            "--read-only-existing-profile";
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private final String[] arguments;
     private final boolean migrateLegacyWallet;
+    private final boolean readOnlyExistingProfile;
     private BackgroundTimerThread backgroundTimerThread = null;
     private boolean xliteRPC = false;
 
     public ConsoleMenu(String[] args) {
+        configureReadOnlyExistingProfile(args);
         this.arguments = sanitiseArguments(args);
         this.migrateLegacyWallet = Arrays.stream(arguments)
                 .noneMatch(NO_MIGRATE_LEGACY_WALLET_FLAG::equals);
+        this.readOnlyExistingProfile = Arrays.stream(arguments)
+                .anyMatch(READ_ONLY_EXISTING_PROFILE_FLAG::equals);
         LOGGER.setLevel(Level.INFO);
+    }
+
+    /**
+     * Select the profile policy before App constructs logging or any class can
+     * construct a ConfigHelper. Read-only startup deliberately permits exactly
+     * the three flags the managed launcher needs.
+     */
+    public static void configureReadOnlyExistingProfile(String[] args) {
+        String[] supplied = args == null ? new String[0] : args;
+        boolean readOnly = false;
+        for (String argument : supplied) {
+            if (READ_ONLY_EXISTING_PROFILE_FLAG.equals(argument)) {
+                readOnly = true;
+            } else if (argument != null
+                    && argument.startsWith(READ_ONLY_EXISTING_PROFILE_FLAG + "=")) {
+                throw new IllegalArgumentException(
+                        "Values for " + READ_ONLY_EXISTING_PROFILE_FLAG + " are not accepted.");
+            }
+        }
+
+        if (readOnly) {
+            List<String> approvedFlags = List.of(READ_ONLY_EXISTING_PROFILE_FLAG,
+                    NO_MIGRATE_LEGACY_WALLET_FLAG, "--password");
+            List<String> actualFlags = Arrays.asList(supplied);
+            if (!actualFlags.contains(NO_MIGRATE_LEGACY_WALLET_FLAG)
+                    || !actualFlags.contains("--password")
+                    || actualFlags.size() != approvedFlags.size()
+                    || !actualFlags.stream().allMatch(approvedFlags::contains)
+                    || approvedFlags.stream().anyMatch(flag ->
+                    actualFlags.stream().filter(flag::equals).count() != 1)) {
+                throw new IllegalArgumentException(READ_ONLY_EXISTING_PROFILE_FLAG
+                        + " requires exactly " + NO_MIGRATE_LEGACY_WALLET_FLAG
+                        + " and --password.");
+            }
+        }
+
+        ConfigHelper.setReadOnlyExistingProfile(readOnly);
     }
 
     private static String[] sanitiseArguments(String[] args) {
@@ -52,15 +96,18 @@ public class ConsoleMenu {
         List<String> valueFlags = List.of("--development-endpoint", "--exr-endpoint");
         List<String> stdinOnlyFlags = List.of("--password", "--createdefaultwallet",
                 "--createwalletmnemonic", "--changepassword", "--getmnemonic");
-        List<String> valueFreeFlags = List.of(NO_MIGRATE_LEGACY_WALLET_FLAG);
+        List<String> valueFreeFlags = List.of(NO_MIGRATE_LEGACY_WALLET_FLAG,
+                READ_ONLY_EXISTING_PROFILE_FLAG);
 
         for (int i = 0; i < args.length; i++) {
             String argument = args[i];
             if (argument == null || !argument.startsWith("--"))
                 throw new IllegalArgumentException("Secret-bearing positional arguments are not accepted.");
-            if (argument.startsWith(NO_MIGRATE_LEGACY_WALLET_FLAG + "="))
-                throw new IllegalArgumentException(
-                        "Values for " + NO_MIGRATE_LEGACY_WALLET_FLAG + " are not accepted.");
+            for (String valueFreeFlag : valueFreeFlags) {
+                if (argument.startsWith(valueFreeFlag + "="))
+                    throw new IllegalArgumentException(
+                            "Values for " + valueFreeFlag + " are not accepted.");
+            }
 
             safeArguments.add(argument);
             if (valueFlags.contains(argument)) {
@@ -97,6 +144,10 @@ public class ConsoleMenu {
         int selection;
         String newWalletStr = "";
         Scanner input = new Scanner(System.in);
+
+        if (readOnlyExistingProfile) {
+            validateReadOnlyExistingProfile();
+        }
 
         if (KeyHandler.existsBaseECKeyFromLocal()) {
             newWalletStr = "- Disabled. Wallet already exists.";
@@ -220,6 +271,7 @@ public class ConsoleMenu {
                         break;
                     }
                     case NO_MIGRATE_LEGACY_WALLET_FLAG:
+                    case READ_ONLY_EXISTING_PROFILE_FLAG:
                         break;
                     case "--password": {
                         String password = readPassword(input, "");
@@ -377,7 +429,8 @@ public class ConsoleMenu {
         long startTime = System.currentTimeMillis();
         // Initialize Blocknet first (synchronous) as it's the active currency
         CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET)
-                .init(entropy, userMnemonic, isMnemonic, xliteRPC, migrateLegacyWallet);
+                .init(entropy, userMnemonic, isMnemonic, xliteRPC, migrateLegacyWallet,
+                        readOnlyExistingProfile);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.log(Level.SEVERE, msg);
@@ -400,9 +453,12 @@ public class ConsoleMenu {
         long totalTime = endTime - startTime;
         LOGGER.log(Level.INFO, "[coin] Concurrent coins initialization completed in " + totalTime + " ms");
 
+        App.masterRPC = App.masterRPC == null ? JSONRPCController.getMasterServer() : App.masterRPC;
         App.masterRPC.start();
-        backgroundTimerThread = new BackgroundTimerThread();
-        (new Thread(backgroundTimerThread)).start();
+        if (!readOnlyExistingProfile) {
+            backgroundTimerThread = new BackgroundTimerThread();
+            (new Thread(backgroundTimerThread)).start();
+        }
         // Start EXR capability probing after wallet is decrypted
         if (App.exrServerPool != null) {
             App.exrServerPool.probeAllCapabilities();
@@ -442,7 +498,7 @@ public class ConsoleMenu {
                             LOGGER.log(Level.FINE, "[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
                             CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
                                     .init(entropy, userMnemonic, isMnemonic, xliteRPC,
-                                            migrateLegacyWallet);
+                                            migrateLegacyWallet, readOnlyExistingProfile);
                             if (coinError != null) {
                                 LOGGER.log(Level.WARNING, "[" + coinTicker.name() + "] Error(" +
                                         coinError.getCode().name() + "): " + coinError.getMessage());
@@ -530,10 +586,42 @@ public class ConsoleMenu {
                 "  --xliterpc                Increment RPC port by 1\n" +
                 "  --no-migrate-legacy-wallet\n" +
                 "                           Read a legacy V1 wallet without rewriting it\n" +
+                "  --read-only-existing-profile\n" +
+                "                           Requires --no-migrate-legacy-wallet --password\n" +
+                "                           and never writes the existing profile\n" +
                 "  --password                Set password from stdin\n" +
                 "                           Password is read from stdin.\n" +
                 "  --getmnemonic             Mnemonic export is disabled\n" +
                 "  --changepassword          Change wallet password\n" +
                 "                           Both passwords are read from stdin.\n";
+    }
+
+    private void validateReadOnlyExistingProfile() {
+        if (!KeyHandler.hasStructurallyValidExistingWallet()) {
+            throw new IllegalStateException(
+                    "Read-only existing-profile startup requires a structurally valid wallet.");
+        }
+        ConfigHelper master = validateRequiredConfiguration("master");
+        ConfigHelper block = validateRequiredConfiguration(
+                CoinTickerUtils.tickerToString(CoinTicker.BLOCKNET));
+        ConfigHelper litecoin = validateRequiredConfiguration(
+                CoinTickerUtils.tickerToString(CoinTicker.LITECOIN));
+        if (master.getRpcPort() == block.getRpcPort()
+                || master.getRpcPort() == litecoin.getRpcPort()
+                || block.getRpcPort() == litecoin.getRpcPort()) {
+            throw new IllegalStateException(
+                    "Read-only existing-profile startup requires unique master, BLOCK and LTC RPC ports.");
+        }
+    }
+
+    private ConfigHelper validateRequiredConfiguration(String ticker) {
+        ConfigHelper config = new ConfigHelper(ticker);
+        if (!config.isValidConfiguration() || config.getRpcPort() < 1
+                || config.getRpcPort() > 65535
+                || !config.isRpcEnabled() || !config.validAuth()) {
+            throw new IllegalStateException("Read-only existing-profile startup requires a valid "
+                    + ticker + " configuration.");
+        }
+        return config;
     }
 }

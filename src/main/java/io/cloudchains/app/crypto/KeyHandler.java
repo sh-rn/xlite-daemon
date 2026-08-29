@@ -120,6 +120,42 @@ public class KeyHandler {
     }
 
     /**
+     * Verify that an already existing wallet has an accepted V1 or V2 on-disk
+     * shape without decrypting, creating, migrating or rewriting it.
+     */
+    public static boolean hasStructurallyValidExistingWallet() {
+        File file = keyFile();
+        if (!file.isFile())
+            return false;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String firstLine = reader.readLine();
+            if (firstLine == null || firstLine.isEmpty())
+                return false;
+
+            boolean v2 = (VERSION_HEADER + VERSION_2_SHA256).equals(firstLine);
+            if (firstLine.startsWith(VERSION_HEADER) && !v2)
+                return false;
+
+            String salt = v2 ? reader.readLine() : firstLine;
+            String iv = v2 ? reader.readLine() : null;
+            String encrypted = reader.readLine();
+            if (salt == null || salt.isEmpty() || encrypted == null || encrypted.isEmpty()
+                    || v2 && (iv == null || iv.isEmpty()) || reader.readLine() != null)
+                return false;
+
+            byte[] saltBytes = Base64.decode(salt);
+            byte[] encryptedBytes = Base64.decode(encrypted);
+            if (saltBytes.length != SALT_LENGTH || encryptedBytes.length == 0
+                    || encryptedBytes.length % IV_LENGTH != 0)
+                return false;
+            return !v2 || Base64.decode(iv).length == IV_LENGTH;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Decrypt and return the mnemonic seed phrase.
      *
      * <p>If no wallet file exists, a new one is generated and persisted.
@@ -150,6 +186,11 @@ public class KeyHandler {
     public static List<String> getBaseSeed(char[] passphrase, boolean migrateLegacyWallet) {
         File file = keyFile();
         if (!file.exists()) {
+            if (ConfigHelper.isReadOnlyExistingProfile()) {
+                LOGGER.log(Level.WARNING,
+                        "[security] Read-only existing-profile mode requires an existing wallet");
+                return null;
+            }
             return generateAndPersistNewSeed(passphrase, file);
         }
         try {
