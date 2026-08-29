@@ -22,3 +22,9 @@
   builds with `project.build.outputTimestamp=1787990474` produced
   `target/xlite-daemon-0.5.15.jar`, 13,519,396 bytes,
   SHA-256 `0033490e272d2991881a8e8baf3430eb05ca8ca22bd12d4df94569ccb6fe8af6`.
+- [x] T7 Refresh required BLOCK/LTC heights once through the existing public
+  height client before read-only master RPC readiness, fail closed on missing
+  heights, retain the no-background-timer boundary, and rebuild the exact JAR.
+  Evidence: Java 21 focused tests passed 17/17 and the full suite passed 85/85.
+  Two consecutive deterministic packages produced 13,519,552-byte JARs with
+  SHA-256 `d798f0da8c757a8534cdb7bec035c61dc6fb2ce4e1ff3a2f1ad1f88b8aab5060`.

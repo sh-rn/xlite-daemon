@@ -23,5 +23,11 @@ would reload configuration or derive a persisted next address. The background
 timer does not create a log-rotation scheduler in read-only mode. `App` skips
 file logging and initial log rotation entirely.
 
+Because the ordinary background timer is not constructed, read-only startup
+performs one existing public height-client refresh after coin initialisation
+and before master RPC readiness. It accepts only positive in-memory BLOCK and
+LTC heights and otherwise exits fail-closed. This does not write configuration,
+wallet, log or profile data and does not enable the ordinary background timer.
+
 This is a narrowly scoped zero-fund lifecycle containment mode. It does not
 authorise write-enabled wallet behaviour or production packaging.

@@ -14,3 +14,7 @@
 - R7: `reloadconfig` and `getnewaddress` fail closed in read-only mode.
 - R8: Focused tests prove argument policy, profile validation, V1/V2 acceptance
   and a whole temporary-profile byte snapshot before and after read-only reads.
+- R9: Before read-only RPC readiness, obtain current BLOCK and LTC heights
+  through the existing public height client, update only in-memory counters and
+  fail closed if either required height remains unavailable. Do not construct
+  the ordinary background timer or write profile state.

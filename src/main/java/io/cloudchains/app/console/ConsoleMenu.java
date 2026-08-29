@@ -454,6 +454,14 @@ public class ConsoleMenu {
         LOGGER.log(Level.INFO, "[coin] Concurrent coins initialization completed in " + totalTime + " ms");
 
         App.masterRPC = App.masterRPC == null ? JSONRPCController.getMasterServer() : App.masterRPC;
+        if (readOnlyExistingProfile) {
+            App.heightUpdateHttpClient.getAllBlockCounts();
+            if (CoinInstance.getBlockCountByTicker(CoinTicker.BLOCKNET) <= 0
+                    || CoinInstance.getBlockCountByTicker(CoinTicker.LITECOIN) <= 0) {
+                throw new IllegalStateException(
+                        "Read-only existing-profile mode requires current BLOCK and LTC heights");
+            }
+        }
         App.masterRPC.start();
         if (!readOnlyExistingProfile) {
             backgroundTimerThread = new BackgroundTimerThread();

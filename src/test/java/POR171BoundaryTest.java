@@ -124,6 +124,23 @@ class POR171BoundaryTest {
         assertFalse(readme.contains("WALLET_MNEMONIC"));
     }
 
+    @Test
+    void readOnlyStartupRequiresRealBlockAndLitecoinHeightsBeforeMasterRpc() throws Exception {
+        String console = Files.readString(SOURCE_ROOT.resolve(
+                "io/cloudchains/app/console/ConsoleMenu.java"));
+        int refresh = console.indexOf("App.heightUpdateHttpClient.getAllBlockCounts();");
+        int blockGate = console.indexOf(
+                "CoinInstance.getBlockCountByTicker(CoinTicker.BLOCKNET) <= 0");
+        int litecoinGate = console.indexOf(
+                "CoinInstance.getBlockCountByTicker(CoinTicker.LITECOIN) <= 0");
+        int masterStart = console.indexOf("App.masterRPC.start();");
+
+        assertTrue(refresh >= 0);
+        assertTrue(blockGate > refresh);
+        assertTrue(litecoinGate > blockGate);
+        assertTrue(masterStart > litecoinGate);
+    }
+
     private static void assertServerBindsAndStops(String className, boolean asset)
             throws Exception {
         Thread server = createServer(className, asset);
