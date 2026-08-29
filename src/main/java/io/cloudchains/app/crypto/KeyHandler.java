@@ -130,6 +130,24 @@ public class KeyHandler {
      * @return the mnemonic word list, or {@code null} if decryption fails
      */
     public static List<String> getBaseSeed(char[] passphrase) {
+        return getBaseSeed(passphrase, true);
+    }
+
+    /**
+     * Decrypt and return the mnemonic seed phrase with an explicit legacy
+     * migration policy.
+     *
+     * <p>The policy affects only an existing V1 wallet. Passing {@code false}
+     * decrypts that wallet for the current process without renaming, backing up
+     * or rewriting it. Missing-wallet and V2 behaviour are unchanged.
+     *
+     * @param passphrase caller-owned char array; <b>must</b> be zeroed by the
+     *                   caller immediately after this method returns
+     * @param migrateLegacyWallet whether an existing V1 wallet should be
+     *                            migrated to V2 after successful decryption
+     * @return the mnemonic word list, or {@code null} if decryption fails
+     */
+    public static List<String> getBaseSeed(char[] passphrase, boolean migrateLegacyWallet) {
         File file = keyFile();
         if (!file.exists()) {
             return generateAndPersistNewSeed(passphrase, file);
@@ -137,10 +155,15 @@ public class KeyHandler {
         try {
             WalletData data = readWalletFile(file);
             if (data.version == VERSION_1_SHA1) {
-                LOGGER.log(Level.INFO,
-                        "[security] Legacy V1 wallet detected — migrating to V2 (SHA-256/CBC)");
                 String seed = decryptSeedEcb(passphrase, data.encrypted, data.salt);
-                migrateToNewFormat(passphrase, seed, file);
+                if (migrateLegacyWallet) {
+                    LOGGER.log(Level.INFO,
+                            "[security] Legacy V1 wallet detected - migrating to V2 (SHA-256/CBC)");
+                    migrateToNewFormat(passphrase, seed, file);
+                } else {
+                    LOGGER.log(Level.INFO,
+                            "[security] Legacy V1 wallet opened without migration by explicit process policy");
+                }
                 return Arrays.asList(seed.split("\\s+"));
             }
             String seed = decryptSeedCbc(passphrase, data.encrypted, data.salt, data.iv);

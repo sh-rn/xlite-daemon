@@ -14,6 +14,7 @@ import io.cloudchains.app.util.background.BackgroundTimerThread;
 import java.io.Console;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
@@ -27,14 +28,19 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class ConsoleMenu {
+    private static final String NO_MIGRATE_LEGACY_WALLET_FLAG =
+            "--no-migrate-legacy-wallet";
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
     private final String[] arguments;
+    private final boolean migrateLegacyWallet;
     private BackgroundTimerThread backgroundTimerThread = null;
     private boolean xliteRPC = false;
 
     public ConsoleMenu(String[] args) {
         this.arguments = sanitiseArguments(args);
+        this.migrateLegacyWallet = Arrays.stream(arguments)
+                .noneMatch(NO_MIGRATE_LEGACY_WALLET_FLAG::equals);
         LOGGER.setLevel(Level.INFO);
     }
 
@@ -46,11 +52,15 @@ public class ConsoleMenu {
         List<String> valueFlags = List.of("--development-endpoint", "--exr-endpoint");
         List<String> stdinOnlyFlags = List.of("--password", "--createdefaultwallet",
                 "--createwalletmnemonic", "--changepassword", "--getmnemonic");
+        List<String> valueFreeFlags = List.of(NO_MIGRATE_LEGACY_WALLET_FLAG);
 
         for (int i = 0; i < args.length; i++) {
             String argument = args[i];
             if (argument == null || !argument.startsWith("--"))
                 throw new IllegalArgumentException("Secret-bearing positional arguments are not accepted.");
+            if (argument.startsWith(NO_MIGRATE_LEGACY_WALLET_FLAG + "="))
+                throw new IllegalArgumentException(
+                        "Values for " + NO_MIGRATE_LEGACY_WALLET_FLAG + " are not accepted.");
 
             safeArguments.add(argument);
             if (valueFlags.contains(argument)) {
@@ -60,6 +70,10 @@ public class ConsoleMenu {
                     && i + 1 < args.length && !args[i + 1].startsWith("--")) {
                 throw new IllegalArgumentException(
                         "Secret values for " + argument + " must be entered through stdin.");
+            } else if (valueFreeFlags.contains(argument)
+                    && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+                throw new IllegalArgumentException(
+                        "Values for " + argument + " are not accepted.");
             }
         }
         return safeArguments.toArray(new String[0]);
@@ -205,6 +219,8 @@ public class ConsoleMenu {
 
                         break;
                     }
+                    case NO_MIGRATE_LEGACY_WALLET_FLAG:
+                        break;
                     case "--password": {
                         String password = readPassword(input, "");
                         int strength = KeyHandler.calculatePasswordStrength(password);
@@ -360,7 +376,8 @@ public class ConsoleMenu {
         // Measure total initialization time for all coins
         long startTime = System.currentTimeMillis();
         // Initialize Blocknet first (synchronous) as it's the active currency
-        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET).init(entropy, userMnemonic, isMnemonic, xliteRPC);
+        CoinInstance.CoinError coinError = CoinInstance.getInstance(CoinTicker.BLOCKNET)
+                .init(entropy, userMnemonic, isMnemonic, xliteRPC, migrateLegacyWallet);
         if (coinError != null) {
             String msg = "[master] Error(" + coinError.getCode().name() + "): " + coinError.getMessage();
             LOGGER.log(Level.SEVERE, msg);
@@ -376,7 +393,8 @@ public class ConsoleMenu {
         }
 
         // Initialize remaining coins concurrently
-        initializeCoinsConcurrently(otherCoins, entropy, userMnemonic, isMnemonic, xliteRPC);
+        initializeCoinsConcurrently(otherCoins, entropy, userMnemonic, isMnemonic, xliteRPC,
+                migrateLegacyWallet);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
@@ -398,9 +416,11 @@ public class ConsoleMenu {
      * @param userMnemonic User mnemonic (if any)
      * @param isMnemonic Whether the input is a mnemonic
      * @param xliteRPC Whether to use xlite RPC
+     * @param migrateLegacyWallet Whether to migrate an existing V1 wallet
      */
     private void initializeCoinsConcurrently(List<CoinTicker> coinTickers, String entropy,
-                                             String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
+                                             String userMnemonic, boolean isMnemonic,
+                                             boolean xliteRPC, boolean migrateLegacyWallet) {
         if (coinTickers.isEmpty()) {
             return;
         }
@@ -421,7 +441,8 @@ public class ConsoleMenu {
                         try {
                             LOGGER.log(Level.FINE, "[coin] Initializing " + CoinTickerUtils.tickerToString(coinTicker) + " concurrently");
                             CoinInstance.CoinError coinError = CoinInstance.getInstance(coinTicker)
-                                    .init(entropy, userMnemonic, isMnemonic, xliteRPC);
+                                    .init(entropy, userMnemonic, isMnemonic, xliteRPC,
+                                            migrateLegacyWallet);
                             if (coinError != null) {
                                 LOGGER.log(Level.WARNING, "[" + coinTicker.name() + "] Error(" +
                                         coinError.getCode().name() + "): " + coinError.getMessage());
@@ -507,6 +528,8 @@ public class ConsoleMenu {
                 "  --createdefaultwallet     Create a default wallet\n" +
                 "  --createwalletmnemonic    Create a wallet with a mnemonic\n" +
                 "  --xliterpc                Increment RPC port by 1\n" +
+                "  --no-migrate-legacy-wallet\n" +
+                "                           Read a legacy V1 wallet without rewriting it\n" +
                 "  --password                Set password from stdin\n" +
                 "                           Password is read from stdin.\n" +
                 "  --getmnemonic             Mnemonic export is disabled\n" +

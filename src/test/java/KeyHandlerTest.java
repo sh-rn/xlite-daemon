@@ -10,6 +10,7 @@ import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -324,6 +325,51 @@ public class KeyHandlerTest {
                 "A timestamped legacy backup must be created during migration");
     }
 
+    @Test
+    @Order(17)
+    void testLegacyWalletCanBeReadWithoutMigration() throws IOException {
+        createLegacyWalletFile();
+        byte[] walletBefore = Files.readAllBytes(testKeyFile.toPath());
+        String[] backupsBefore = legacyBackupNames();
+
+        char[] passphrase = TEST_PASSPHRASE.toCharArray();
+        try {
+            List<String> seed = KeyHandler.getBaseSeed(passphrase, false);
+            assertNotNull(seed, "Legacy wallet must be readable when migration is disabled");
+            assertEquals(TEST_MNEMONIC_LIST, seed);
+        } finally {
+            Arrays.fill(passphrase, '\0');
+        }
+
+        assertArrayEquals(walletBefore, Files.readAllBytes(testKeyFile.toPath()),
+                "Migration-disabled reads must leave every legacy wallet byte unchanged");
+        assertArrayEquals(backupsBefore, legacyBackupNames(),
+                "Migration-disabled reads must not create a legacy migration backup");
+    }
+
+    @Test
+    @Order(18)
+    void testV2WalletReadIsUnchangedWhenMigrationIsDisabled() throws IOException {
+        char[] importPassphrase = TEST_PASSPHRASE.toCharArray();
+        try {
+            assertTrue(KeyHandler.importFromMnemonic(TEST_MNEMONIC_LIST, importPassphrase));
+        } finally {
+            Arrays.fill(importPassphrase, '\0');
+        }
+        byte[] walletBefore = Files.readAllBytes(testKeyFile.toPath());
+
+        char[] readPassphrase = TEST_PASSPHRASE.toCharArray();
+        try {
+            List<String> seed = KeyHandler.getBaseSeed(readPassphrase, false);
+            assertEquals(TEST_MNEMONIC_LIST, seed);
+        } finally {
+            Arrays.fill(readPassphrase, '\0');
+        }
+
+        assertArrayEquals(walletBefore, Files.readAllBytes(testKeyFile.toPath()),
+                "The legacy migration policy must not change V2 wallet reads");
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================
@@ -362,6 +408,15 @@ public class KeyHandlerTest {
         } catch (Exception e) {
             throw new IOException("Failed to create legacy wallet file for test", e);
         }
+    }
+
+    private String[] legacyBackupNames() {
+        File dataDir = new File(ConfigHelper.getLocalDataDirectory());
+        String[] names = dataDir.list(
+                (dir, name) -> name.startsWith("key-backup-legacy-"));
+        if (names == null) return new String[0];
+        Arrays.sort(names);
+        return names;
     }
 
     /** Read the wallet file and return its lines, or an empty array if absent. */

@@ -12,11 +12,7 @@ import java.nio.file.Path;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class POR171BoundaryTest {
     private static final Path SOURCE_ROOT = Path.of("src/main/java");
@@ -31,7 +27,7 @@ class POR171BoundaryTest {
                 "io/cloudchains/app/net/api/JSONRPCServer.java"));
         String master = Files.readString(SOURCE_ROOT.resolve(
                 "io/cloudchains/app/net/api/JSONRPCMasterServer.java"));
-        for (String source : new String[] {asset, master}) {
+        for (String source : new String[]{asset, master}) {
             assertTrue(source.contains("InetAddress.getByName(\"127.0.0.1\")"));
             assertFalse(source.contains("InetAddress.getLoopbackAddress()"));
             assertFalse(source.contains("bootstrap.bind(port)"));
@@ -53,8 +49,8 @@ class POR171BoundaryTest {
                 "readPassword", Scanner.class, String.class);
         readPassword.setAccessible(true);
         assertThrows(IllegalArgumentException.class,
-                () -> new ConsoleMenu(new String[] {"--password", "cli-secret"}));
-        ConsoleMenu menu = new ConsoleMenu(new String[] {"--password"});
+                () -> new ConsoleMenu(new String[]{"--password", "cli-secret"}));
+        ConsoleMenu menu = new ConsoleMenu(new String[]{"--password"});
         assertEquals("stdin-secret", readPassword.invoke(menu,
                 new Scanner("stdin-secret\n"), ""));
 
@@ -66,13 +62,38 @@ class POR171BoundaryTest {
         assertTrue(console.contains("sanitiseArguments"));
         assertTrue(console.contains("Mnemonic export is disabled."));
 
-        ArgMenu menuStub = new ArgMenu(new String[] {"--new-wallet", "cli-secret"});
+        ArgMenu menuStub = new ArgMenu(new String[]{"--new-wallet", "cli-secret"});
         assertThrows(IllegalStateException.class, menuStub::init);
     }
 
     @Test
+    void legacyNoMigrationOptionIsValueFreeAndOrderIndependent() throws Exception {
+        Field migrateLegacyWallet = ConsoleMenu.class.getDeclaredField("migrateLegacyWallet");
+        migrateLegacyWallet.setAccessible(true);
+
+        ConsoleMenu optionFirst = new ConsoleMenu(new String[]{
+                "--no-migrate-legacy-wallet", "--password"});
+        ConsoleMenu passwordFirst = new ConsoleMenu(new String[]{
+                "--password", "--no-migrate-legacy-wallet"});
+        ConsoleMenu defaultPolicy = new ConsoleMenu(new String[]{"--password"});
+
+        assertFalse(migrateLegacyWallet.getBoolean(optionFirst));
+        assertFalse(migrateLegacyWallet.getBoolean(passwordFirst));
+        assertTrue(migrateLegacyWallet.getBoolean(defaultPolicy));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ConsoleMenu(new String[]{
+                        "--no-migrate-legacy-wallet", "unexpected-value", "--password"}));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ConsoleMenu(new String[]{
+                        "--no-migrate-legacy-wallet=unexpected-value", "--password"}));
+        assertTrue(ConsoleMenu.getHelpText().contains("--no-migrate-legacy-wallet"));
+        assertTrue(ConsoleMenu.getHelpText().contains(
+                "Read a legacy V1 wallet without rewriting it"));
+    }
+
+    @Test
     void rpcDiagnosticsNeverIncludePayloadsOrSecrets() throws Exception {
-        for (Path handlerPath : new Path[] {HANDLER, MASTER_HANDLER}) {
+        for (Path handlerPath : new Path[]{HANDLER, MASTER_HANDLER}) {
             String source = Files.readString(handlerPath);
             assertFalse(source.contains("params.get(i).toString()"));
             assertFalse(source.contains("PARAM \" + i"));

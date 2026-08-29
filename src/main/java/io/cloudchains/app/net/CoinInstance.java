@@ -341,10 +341,15 @@ public class CoinInstance {
     }
 
     public CoinError init(String pw, String userMnemonic, boolean isMnemonic) {
-        return init(pw, userMnemonic, isMnemonic, false);
+        return init(pw, userMnemonic, isMnemonic, false, true);
     }
 
     public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC) {
+        return init(pw, userMnemonic, isMnemonic, xliteRPC, true);
+    }
+
+    public CoinError init(String pw, String userMnemonic, boolean isMnemonic, boolean xliteRPC,
+                          boolean migrateLegacyWallet) {
         switch (ticker) {
             case BLOCKNET: {
                 LOGGER.log(Level.FINER, "[coin] Initializing for Blocknet main network.");
@@ -491,7 +496,7 @@ public class CoinInstance {
 
             char[] readPassphrase = pw.toCharArray();
             try {
-                baseSeed = KeyHandler.getBaseSeed(readPassphrase);
+                baseSeed = KeyHandler.getBaseSeed(readPassphrase, migrateLegacyWallet);
             } finally {
                 Arrays.fill(readPassphrase, '\0');
             }
