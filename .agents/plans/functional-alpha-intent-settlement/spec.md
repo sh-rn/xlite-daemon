@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation proposal
 
-Status: T10 denial prerequisite complete - settlement and runtime remain held
+Status: T10 denial prerequisite independently accepted - settlement and runtime remain held
 
 ## Outcome
 
@@ -23,6 +23,13 @@ This proposal is the XLite mutation dossier required by Desktop task
 - Base tree: `9997761b3d02812a557055cba8d0993f3d23f12f`
 - Proposal branch: `codex/functional-alpha-intent-settlement`
 - Java/Maven baseline: Java 21 and Maven 3.8.6 or later
+
+The independently accepted denial-only source head is
+`5f8a15759b027b1fd4205bfb067130b7040d6bea`, tree
+`71b5f33fc8931918bcc40f002b4ff6726a13316e`. The exact T04 future-source
+dossier is
+[`docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md`](../../../docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md).
+It remains a review draft and authorises no source.
 
 The repository standing authority permits this proposal and later normal
 delivery work in `sh-rn/xlite-daemon`. It does not make an unreviewed interface,
@@ -118,6 +125,12 @@ parser, store, reservation, proof, signer, broadcaster, chain constant or live
 wiring. T10 is checked only because the complete inventory and Java 21 focused
 and relevant full tests passed; its evidence is recorded in `tasks.md`.
 T02/T03/T05-T09 and all runtime/funds gates remain held.
+
+The T04 review also found that IS-SEQ-004's statement that the proposal body
+shapes are adopted is not enough to implement a closed parser where the
+proposal gives only narrative, unnamed nested or status-specific fields. Those
+exact schema gaps must be resolved by an additive joint contract before parser
+source can be authorised.
 
 ## Dependency hold
 

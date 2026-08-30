@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation tasks
 
-Status: T10 denial prerequisite implemented - independent follow-up review pending
+Status: T10 denial prerequisite independently accepted - T04 review draft open
 
 `XL-IS-SEQ-001` authorises only T10 ahead of T02/T03/T07. Independent review
 subject: `9bfc85d6e7aee1dbf99943ed113575a6805a3ddd`; reviewer:
@@ -23,6 +23,11 @@ Every other task remains held.
       base/head/tree, branch, every existing/new file, class/method, dependency,
       test, build command, expected remote action and complete bypass inventory.
       Obtain exact independent review before source work.
+      Draft evidence: `docs/protocols/functional-alpha-intent-settlement-
+      mutation-manifest.md` pins the exact proposed add-only source surface and
+      all hold boundaries. It remains unchecked because it has not received
+      independent exact-commit review and because the joint contract still
+      lacks several exact nested/status-specific body shapes.
 - [ ] **XL-IS-T05** - Implement only the reviewed value-free launch selector,
       private authenticated transport and closed schema parsing. Keep the
       capability unavailable without admitted policy/store/executor components.
@@ -54,6 +59,12 @@ Every other task remains held.
       proof/raw-create/input-signing compatibility. Java 21 focused
       compatibility tests passed 36/36 and the complete suite passed 89/89
       with zero failures, errors or skips.
+      Independent evidence: coordinator PASS on exact sequence
+      `9bfc85d6e7aee1dbf99943ed113575a6805a3ddd` to
+      `0963adc5cf96d03f0473f2c0714fa10dde682482` to
+      `5f8a15759b027b1fd4205bfb067130b7040d6bea`, final tree
+      `71b5f33fc8931918bcc40f002b4ff6726a13316e`, with Java 21
+      Surefire 89/89 and zero failures, errors or skips.
 - [ ] **XL-IS-T11** - Run Java 21 focused/full/hostile/crash tests, inspect all
       OpenRewrite drift, produce two byte-identical shaded JARs and close exact
       dependency/licence/provenance/SBOM/source identities.

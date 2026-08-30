@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation design
 
-Status: T10 denial prerequisite implemented - named settlement design remains proposed
+Status: T10 denial independently accepted - named settlement design remains proposed
 
 ## Ownership and transport
 
@@ -234,3 +234,16 @@ This boundary has no success path in managed mode and defines no settlement
 request. Its only output is a generic unavailable denial or an in-process
 exception without private values. It therefore cannot substitute for T02/T03,
 the six named operations or a runtime admission.
+
+## XL-IS-T04 source-only dossier
+
+The exact proposed future file, class, method, selector, envelope, inert-store,
+test, build, transport, credential and bypass inventory is recorded in
+[`functional-alpha-intent-settlement-mutation-manifest.md`](../../../docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md).
+It changes no source and leaves T04 unchecked pending independent review.
+
+IS-SEQ-004 calls the proposal's operation-specific body fields adopted closed
+parser shapes. That statement is insufficient where the immutable proposal
+does not actually enumerate nested keys or status-specific result bodies. The
+dossier identifies each missing exact shape as a hard pre-code blocker. No
+generic body, inferred name or implementation-selected value is permitted.

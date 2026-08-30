@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation requirements
 
-Status: T10 denial requirement fulfilled - named settlement requirements remain open
+Status: T10 denial independently accepted - named settlement requirements remain open
 
 - **XL-IS-001** - Desktop main is the sole creator and durable authority for
   parent intents and child stages. XLite accepts requests only from its distinct
@@ -93,3 +93,9 @@ Status: T10 denial requirement fulfilled - named settlement requirements remain 
   complete bypass inventory, post-Rewrite diff inspection, two byte-identical
   builds, licence/provenance closure and independent exact-head review must pass
   before any JAR can be proposed for Desktop admission. None authorises funds.
+- **XL-IS-021** - Before source-only parser, identity or inert-store work, an
+  exact T04 dossier must pin repository/head/tree/branch, every file/class/
+  method, selector/envelope, dependency, test/build command, persistence,
+  credential/transport boundary, remote action and alternate route. Narrative
+  or unnamed nested/status-specific body fields are not a closed schema and
+  block source rather than permitting an implementation choice.
