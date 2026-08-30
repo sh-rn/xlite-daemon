@@ -137,8 +137,9 @@ signrawtransaction <rawtx> - Unavailable until an intent-bound Unified adapter i
 sendrawtransaction <rawtx> - Unavailable until an intent-bound Unified adapter is present
 ```
 
-The advanced `importprivkey` and `dumpprivkey` methods are retained as
-authenticated local wallet-administrator operations for backup and recovery.
+Outside managed read-only mode, the advanced `importprivkey` and `dumpprivkey`
+methods are retained as authenticated local wallet-administrator operations for
+backup and recovery.
 They return or accept raw private-key material and must never be exposed to a
 renderer or an unrestricted RPC proxy. `sendtransaction` is not available.
 `signmessage` is restricted to an exact wallet-owned self-address proof or a
@@ -148,6 +149,11 @@ uppercase transaction IDs are rejected rather than normalised, and Core's
 two-digit exponent form is required at exponent boundaries (for example,
 `1e-05` and `1e+06`). `signrawtransaction` and `sendrawtransaction` fail
 closed with method-not-found until an intent-bound Unified adapter is present.
+In `--read-only-existing-profile` mode, generic raw construction/sign/send,
+address creation, key import/export, mnemonic export, message signing and all
+transfer/send aliases return the same method-not-found response before their
+parameters are inspected. Existing persisted HD addresses are derived only
+during startup and do not increment or rewrite the configured address count.
 
 ## Configuration
 

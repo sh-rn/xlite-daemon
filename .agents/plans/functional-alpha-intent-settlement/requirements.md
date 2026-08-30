@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation requirements
 
-Status: Draft prerequisite only - every implementation task remains open
+Status: T10 denial requirement fulfilled - named settlement requirements remain open
 
 - **XL-IS-001** - Desktop main is the sole creator and durable authority for
   parent intents and child stages. XLite accepts requests only from its distinct

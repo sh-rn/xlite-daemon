@@ -1,6 +1,11 @@
 # Functional Alpha XLite intent-settlement remediation tasks
 
-Status: Draft prerequisite only - no task is complete
+Status: T10 denial prerequisite complete - settlement capability remains held
+
+`XL-IS-SEQ-001` authorises only T10 ahead of T02/T03/T07. Independent review
+subject: `9bfc85d6e7aee1dbf99943ed113575a6805a3ddd`; reviewer:
+`/root/delivery_coordinator`; verdict: PASS for denial-only implementation.
+Every other task remains held.
 
 - [ ] **XL-IS-T01** - Jointly review these four files against Desktop
       `FA-SIGN-001` to `FA-SIGN-016`, `FA-IS-T02`/`T03`/`T11`, recovery
@@ -33,10 +38,19 @@ Status: Draft prerequisite only - no task is complete
 - [ ] **XL-IS-T09** - Implement and test stage-bound broadcast, refund-before-
       funding prerequisite, durable pre-dispatch record, exact returned identity,
       definitive rejection and unknown-outcome quarantine/result lookup.
-- [ ] **XL-IS-T10** - Prove ordinary `signrawtransaction`,
+- [x] **XL-IS-T10** - Prove ordinary `signrawtransaction`,
       `sendrawtransaction`, transfers, address creation, key import/export,
       arbitrary message signing and every alternate helper/endpoint remain
       unavailable in managed mode. Re-run the complete RPC/helper inventory.
+      This is the only implementation task sequenced before T02/T03/T07 by
+      `XL-IS-SEQ-001`; it must preserve positive unmanaged compatibility and
+      creates no private settlement operation.
+      Evidence: `ManagedReadOnlyAuthorityBoundaryTest` exercises hostile
+      parameters and aliases, zero profile/config/key/packet/relay effects,
+      immutable per-instance policy, startup derivation and positive unmanaged
+      address/import/export/proof/raw-create/input-signing compatibility. Java
+      21 focused compatibility tests passed 35/35 and the complete suite passed
+      88/88 with zero failures, errors or skips.
 - [ ] **XL-IS-T11** - Run Java 21 focused/full/hostile/crash tests, inspect all
       OpenRewrite drift, produce two byte-identical shaded JARs and close exact
       dependency/licence/provenance/SBOM/source identities.
@@ -45,6 +59,6 @@ Status: Draft prerequisite only - no task is complete
       digest to Desktop admission. Keep runtime, zero-fund, funded, packaging,
       notarisation and release gates open for their owners.
 
-Committing this draft advances none of these checkboxes. No source file, JAR,
+T10 creates no settlement success path and advances no other checkbox. No JAR,
 wallet profile, runtime, funds or remote repository state is part of this
-proposal tranche.
+denial-only tranche.

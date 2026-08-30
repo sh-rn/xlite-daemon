@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation design
 
-Status: Draft interface proposal - no source implementation authorised by this file
+Status: T10 denial prerequisite implemented - named settlement design remains proposed
 
 ## Ownership and transport
 
@@ -211,3 +211,24 @@ listener allocation, store root/key ownership, durable publication, rollback
 limits, reservation release, exact chain constants, fee caps, stage variants,
 contract fields, proof replay and Core-protocol result verification. This draft
 does not authorise filling those gaps by implementation choice.
+
+## XL-IS-SEQ-001 denial-only implementation boundary
+
+The independently accepted first source tranche is only the existing managed
+read-only denial boundary. Each `CoinInstance` binds its effective read-only
+policy once during initialisation; sensitive helpers consult that immutable
+instance policy, not a mutable global mode. Existing-profile address derivation
+uses a private same-thread initialisation authority that cannot be invoked by an
+RPC/helper caller after startup.
+
+The ordinary coin handler rejects sensitive method names before inspecting
+their parameters. The inventory includes generic raw construction/sign/send,
+address creation, key import/export, mnemonic export, arbitrary message signing,
+transfer/send aliases and XRouter send. Direct transaction-signing, private-key
+import/address-generation and raw-relay helpers enforce the same instance
+policy. Unmanaged behaviour remains covered and unchanged.
+
+This boundary has no success path in managed mode and defines no settlement
+request. Its only output is a generic unavailable denial or an in-process
+exception without private values. It therefore cannot substitute for T02/T03,
+the six named operations or a runtime admission.

@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation proposal
 
-Status: Draft prerequisite only - implementation and runtime admission are held
+Status: T10 denial prerequisite complete - settlement and runtime remain held
 
 ## Outcome
 
@@ -93,7 +93,8 @@ claim that a request is authorised is never sufficient by itself.
 
 ## Out of scope
 
-- Any source implementation under this unreviewed proposal.
+- Any source implementation other than independently authorised T10 denial
+  hardening.
 - Live runtimes, wallet profiles, real keys, funds, orders or transactions.
 - Generic raw transaction, transfer, key or message-signing APIs.
 - Additional assets, testnet, public Beta, existing-profile adoption or a
@@ -101,9 +102,26 @@ claim that a request is authorised is never sufficient by itself.
 - Core source mutation, Desktop recovery implementation, signing, packaging,
   notarisation, release, push, merge, tag or remote publication in this tranche.
 
+## Sequenced denial prerequisite XL-IS-SEQ-001
+
+On 30 August 2026, independent coordinator `/root/delivery_coordinator`
+reviewed exact proposal commit
+`9bfc85d6e7aee1dbf99943ed113575a6805a3ddd` and returned PASS as a coherent
+prerequisite contract. The coordinator authorised only `XL-IS-T10` to proceed
+before Desktop `FA-IS-T02`/`T03` and recovery `FA-RCV-T07` because this tranche
+removes existing generic authority and creates no new capability.
+
+The tranche may add managed read-only denials at existing RPC and in-process
+helper boundaries, explicit alias tests and positive unmanaged-compatibility
+tests. It may not add the proposed selector, endpoint, credential, schema
+parser, store, reservation, proof, signer, broadcaster, chain constant or live
+wiring. T10 is checked only because the complete inventory and Java 21 focused
+and relevant full tests passed; its evidence is recorded in `tasks.md`.
+T02/T03/T05-T09 and all runtime/funds gates remain held.
+
 ## Dependency hold
 
-Implementation remains held until the Desktop connector/schema review
+Named settlement implementation remains held until the Desktop connector/schema review
 `FA-IS-T02`, joint recovery/executor contract `FA-IS-T03` and
 `FA-RCV-T07`, proof-replay decision, exact native mutation review and all
 required source/runtime admission gates are closed. A committed proposal is

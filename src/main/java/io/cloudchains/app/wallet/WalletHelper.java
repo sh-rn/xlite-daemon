@@ -34,6 +34,7 @@ public class WalletHelper {
     }
 
     public Transaction createRawTransactionWithAllUTXOs(Transaction tx, double amount) {
+        coin.requireUnmanagedWalletMutation();
         try {
             ArrayList<UTXO> utxos = coinSelector(amount);
 
@@ -61,6 +62,7 @@ public class WalletHelper {
     }
 
     public Transaction createRawTransactionWithAllUTXOs(ArrayList<TransactionOutput> outputs, double amount) {
+        coin.requireUnmanagedWalletMutation();
         Transaction tx = new Transaction(networkParameters);
 
         for (TransactionOutput output : outputs) {
@@ -169,6 +171,9 @@ public class WalletHelper {
     }
 
     public AddressBalance generateAddress() {
+        if (!coin.isExistingProfileAddressDerivationAllowed())
+            coin.requireUnmanagedWalletMutation();
+
         Wallet wallet = coin.getWallet();
         NetworkParameters params = coin.getNetworkParameters();
 
@@ -194,6 +199,7 @@ public class WalletHelper {
     }
 
     public AddressBalance generateFromPrivateKey(String privKey) {
+        coin.requireUnmanagedWalletMutation();
         NetworkParameters params = coin.getNetworkParameters();
 
         ECKey key = DumpedPrivateKey.fromBase58(params, privKey).getKey();
@@ -227,6 +233,7 @@ public class WalletHelper {
 
     public static Transaction createTransactionSimple(CoinTicker coinTicker, String address, double amount) {
         CoinInstance coinInstance = CoinInstance.getInstance(coinTicker);
+        coinInstance.requireUnmanagedWalletMutation();
         WalletHelper walletHelper = coinInstance.getWalletHelper();
         NetworkParameters params = coinInstance.getNetworkParameters();
 
@@ -288,4 +295,5 @@ public class WalletHelper {
 
         return coin.getNetworkParameters().getP2SHHeader() == version;
     }
+
 }

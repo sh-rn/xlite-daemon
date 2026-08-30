@@ -35,6 +35,8 @@ import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,6 +58,15 @@ class OutputEntry {
 public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
     private final static LogManager LOGMANAGER = LogManager.getLogManager();
     private final static Logger LOGGER = LOGMANAGER.getLogger(Logger.GLOBAL_LOGGER_NAME);
+    private static final Set<String> MANAGED_SENSITIVE_METHODS = Set.of(
+            "broadcast", "broadcasttransaction", "createrawtransaction", "dumpmnemonic",
+            "dumpprivkey", "dumpwallet", "exportmnemonic", "fundrawtransaction",
+            "getmnemonic", "getnewaddress", "getrawchangeaddress", "importmulti",
+            "importprivkey", "importwallet", "move", "send", "sendfrom", "sendmany",
+            "sendrawtransaction", "sendtoaddress", "sendtransaction", "sethdseed",
+            "signmessage", "signmessagewithprivkey", "signrawtransaction",
+            "signrawtransactionwithkey", "signrawtransactionwithwallet", "transfer",
+            "walletcreatefundedpsbt", "xrsendtransaction");
 
     private HTTPClient httpClient;
     private CoinInstance coin;
@@ -248,10 +259,17 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private JsonObject getResponse(String method, JsonArray params) {
         JsonObject response = new JsonObject();
+        String normalisedMethod = method.toLowerCase(Locale.ROOT);
 
-        switch (method.toLowerCase()) {
+        if (coin.isManagedReadOnlyExistingProfile()
+                && MANAGED_SENSITIVE_METHODS.contains(normalisedMethod)) {
+            setRpcError(response, -32601, "Method not found.");
+            return response;
+        }
+
+        switch (normalisedMethod) {
             case "reloadconfig": {
-                if (ConfigHelper.isReadOnlyExistingProfile()) {
+                if (coin.isManagedReadOnlyExistingProfile()) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -32000);
@@ -1071,7 +1089,7 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 break;
             }
             case "getnewaddress": {
-                if (ConfigHelper.isReadOnlyExistingProfile()) {
+                if (coin.isManagedReadOnlyExistingProfile()) {
                     response.add("result", JsonNull.INSTANCE);
                     JsonObject errorJSON = new JsonObject();
                     errorJSON.addProperty("code", -32000);

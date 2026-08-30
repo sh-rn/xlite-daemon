@@ -1,6 +1,5 @@
 package io.cloudchains.app.net;
 
-import com.google.common.base.Joiner;
 import com.google.common.util.concurrent.AtomicDouble;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -111,6 +110,8 @@ public class CoinInstance {
     private int generatedAddressCount;
     private AddressDiscoveryService discoveryService = null;
     private static boolean addressDiscoveryEnabled = true;
+    private Boolean managedReadOnlyExistingProfile;
+    private final ThreadLocal<Boolean> existingProfileAddressDerivation = new ThreadLocal<>();
 
     private CoinInstance(CoinTicker ticker) {
         this.ticker = ticker;
@@ -120,28 +121,6 @@ public class CoinInstance {
 
         if (isBlocknetNetwork())
             setActiveCurrency(this);
-    }
-
-    /**
-    * Return mnemonic seed from wallet stored on disk. Correct passphrase required.
-    * Returns empty string on error or failure to retrieve mnemonic (or if mnemonic
-    * doesn't exist).
-    * @param pw String
-    * @return String
-    */
-    public static String getMnemonicForPw(String pw) {
-        if (!KeyHandler.existsBaseECKeyFromLocal())
-            return "";
-
-        char[] passphrase = pw.toCharArray();
-        try {
-            List<String> seed = KeyHandler.getBaseSeed(passphrase);
-            if (seed == null)
-                return "";
-            return Joiner.on(" ").join(seed);
-        } finally {
-            Arrays.fill(passphrase, '\0');
-        }
     }
 
     public static int getBlockCountByTicker(CoinTicker ticker) {
@@ -200,10 +179,11 @@ public class CoinInstance {
     }
 
     public AddressBalance generateAddress(boolean updateConfig) {
-        if (updateConfig && ConfigHelper.isReadOnlyExistingProfile()) {
-            throw new IllegalStateException(
-                    "Read-only existing-profile mode forbids generating a persisted address.");
-        }
+        requireUnmanagedWalletMutation();
+        return deriveAddress(updateConfig);
+    }
+
+    private AddressBalance deriveAddress(boolean updateConfig) {
         AddressBalance addressKeyPair = getWalletHelper().generateAddress();
         Address address = addressKeyPair.getAddress();
         DumpedPrivateKey privateKey = addressKeyPair.getPrivateKey();
@@ -220,6 +200,7 @@ public class CoinInstance {
     }
 
     public void importPrivateKey(String privKey) {
+        requireUnmanagedWalletMutation();
         AddressBalance addressKeyPair = getWalletHelper().generateFromPrivateKey(privKey);
         AddressBalance addrExists = addressKeyPairs.stream()
                 .filter(e -> e.getAddress().equals(addressKeyPair.getAddress())).findAny().orElse(null);
@@ -366,6 +347,7 @@ public class CoinInstance {
                           boolean migrateLegacyWallet, boolean readOnlyExistingProfile) {
         readOnlyExistingProfile = readOnlyExistingProfile
                 || ConfigHelper.isReadOnlyExistingProfile();
+        readOnlyExistingProfile = bindManagedReadOnlyExistingProfile(readOnlyExistingProfile);
         migrateLegacyWallet = migrateLegacyWallet && !readOnlyExistingProfile;
         switch (ticker) {
             case BLOCKNET: {
@@ -536,10 +518,6 @@ public class CoinInstance {
         // In-memory wallet only
         DeterministicSeed seed = new DeterministicSeed(baseSeed, null, "", System.currentTimeMillis() / 1000);
         wallet = Wallet.fromSeed(networkParameters, seed);
-        if (isBlocknetNetwork()) {
-            String mnemonic = getMnemonic();
-            // LOGGER.log(Level.FINE, "[wallet] Mnemonic = " + mnemonic);
-        }
 
         // RUN ADDRESS DISCOVERY ONLY DURING WALLET INITIALIZATION
         // This ensures discovery runs once at wallet startup in ANY case
@@ -623,7 +601,7 @@ public class CoinInstance {
         int configAddressCount = configHelper.getAddressCount();
         boolean updateConfig = false;
         if (configAddressCount < FORWARD_ADDRESS_COUNT) { // minimum starting addresses
-            if (ConfigHelper.isReadOnlyExistingProfile()) {
+            if (isManagedReadOnlyExistingProfile()) {
                 LOGGER.log(Level.FINE,
                         "[wallet] Read-only existing-profile mode preserves persisted address count");
             } else {
@@ -637,13 +615,21 @@ public class CoinInstance {
         // Ensure that internal HD wallet pointer matches the count we're expecting.
         // Required because wallet doesn't remember last HD wallet address prior to
         // reboot.
-        if (fromStartup) {
-            for (int i = 0; i < generatedAddressCount; i++) {
-                getWalletHelper().generateAddress();
+        boolean managedStartupDerivation = fromStartup && isManagedReadOnlyExistingProfile();
+        if (managedStartupDerivation)
+            existingProfileAddressDerivation.set(Boolean.TRUE);
+        try {
+            if (fromStartup) {
+                for (int i = 0; i < generatedAddressCount; i++) {
+                    getWalletHelper().generateAddress();
+                }
             }
-        }
-        for (int i = generatedAddressCount; i < configAddressCount; i++) {
-            generateAddress(false);
+            for (int i = generatedAddressCount; i < configAddressCount; i++) {
+                deriveAddress(false);
+            }
+        } finally {
+            if (managedStartupDerivation)
+                existingProfileAddressDerivation.remove();
         }
         generatedAddressCount = configAddressCount;
 
@@ -666,10 +652,6 @@ public class CoinInstance {
 
     public Wallet getWallet() {
         return wallet;
-    }
-
-    public String getMnemonic() {
-        return Joiner.on(" ").join(Objects.requireNonNull(getWallet().getKeyChainSeed().getMnemonicCode()));
     }
 
     public double getAllBalances() {
@@ -727,6 +709,10 @@ public class CoinInstance {
     }
 
     public String sendXrMessage(BlocknetPeer blocknetPeer, String uuid, String command, HashMap<String, Object> params) {
+        if (isManagedReadOnlyExistingProfile()
+                && "xrSendTransaction".equalsIgnoreCase(command))
+            throw new IllegalStateException("Wallet mutation is unavailable in managed read-only mode.");
+
         XRouterMessage message = null;
 
         if (blocknetPeer == null || !blocknetPeer.getHaveConfig().get()) {
@@ -1031,7 +1017,7 @@ public class CoinInstance {
     }
 
     public void reloadConfig() {
-        if (ConfigHelper.isReadOnlyExistingProfile()) {
+        if (isManagedReadOnlyExistingProfile()) {
             throw new IllegalStateException(
                     "Read-only existing-profile mode forbids configuration reload.");
         }
@@ -1070,6 +1056,30 @@ public class CoinInstance {
         return Collections.unmodifiableList(addressKeyPairs);
     }
 
+    public boolean isManagedReadOnlyExistingProfile() {
+        return Boolean.TRUE.equals(managedReadOnlyExistingProfile);
+    }
+
+    public boolean isExistingProfileAddressDerivationAllowed() {
+        return isManagedReadOnlyExistingProfile()
+                && Boolean.TRUE.equals(existingProfileAddressDerivation.get());
+    }
+
+    public void requireUnmanagedWalletMutation() {
+        if (isManagedReadOnlyExistingProfile())
+            throw new IllegalStateException(
+                    "Wallet mutation is unavailable in managed read-only mode.");
+    }
+
+    private synchronized boolean bindManagedReadOnlyExistingProfile(boolean readOnly) {
+        if (managedReadOnlyExistingProfile == null) {
+            managedReadOnlyExistingProfile = readOnly;
+        } else if (managedReadOnlyExistingProfile != readOnly) {
+            throw new IllegalStateException("Coin profile policy cannot change after initialisation.");
+        }
+        return managedReadOnlyExistingProfile;
+    }
+
     public List<CloudTransaction> getTransactionList() {
         return Collections.unmodifiableList(transactionObservableList);
     }
@@ -1103,7 +1113,7 @@ public class CoinInstance {
     }
 
     public void runAddressDiscovery() {
-        if (ConfigHelper.isReadOnlyExistingProfile()) {
+        if (isManagedReadOnlyExistingProfile()) {
             LOGGER.log(Level.FINE, "[coin] Read-only existing-profile mode skips address discovery");
             return;
         }

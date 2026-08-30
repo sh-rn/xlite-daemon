@@ -707,25 +707,6 @@ public class HTTPClient {
         return new Gson().fromJson(res, JsonObject.class);
     }
 
-    public JsonObject sendRawTransaction(CoinTicker coinTicker, String rawTx) {
-        ArrayList<String> rawTxParams = new ArrayList<>();
-        rawTxParams.add(0, CoinTickerUtils.tickerToString(coinTicker));
-        rawTxParams.add(1, rawTx);
-
-        JsonArray innerParams = new Gson().toJsonTree(rawTxParams).getAsJsonArray();
-
-        JsonObject params = new JsonObject();
-        params.addProperty("method", "sendrawtransaction");
-        params.add("params", innerParams);
-        String res = executePostRequest("/", params);
-        LOGGER.log(Level.FINER, "[httpclient] sendRawTransaction " + res);
-
-
-        if (res == null) return null;
-
-        return new Gson().fromJson(res, JsonObject.class);
-    }
-
     /**
      * Return all transactions associated with the coin.
      * @param coinTicker Coin
