@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation tasks
 
-Status: T10 denial prerequisite complete - settlement capability remains held
+Status: T10 denial prerequisite implemented - independent follow-up review pending
 
 `XL-IS-SEQ-001` authorises only T10 ahead of T02/T03/T07. Independent review
 subject: `9bfc85d6e7aee1dbf99943ed113575a6805a3ddd`; reviewer:
@@ -45,12 +45,15 @@ Every other task remains held.
       This is the only implementation task sequenced before T02/T03/T07 by
       `XL-IS-SEQ-001`; it must preserve positive unmanaged compatibility and
       creates no private settlement operation.
-      Evidence: `ManagedReadOnlyAuthorityBoundaryTest` exercises hostile
-      parameters and aliases, zero profile/config/key/packet/relay effects,
-      immutable per-instance policy, startup derivation and positive unmanaged
-      address/import/export/proof/raw-create/input-signing compatibility. Java
-      21 focused compatibility tests passed 35/35 and the complete suite passed
-      88/88 with zero failures, errors or skips.
+      Evidence: `ManagedReadOnlyAuthorityBoundaryTest` exercises the real
+      Netty handler through `EmbeddedChannel` and proves byte-identical
+      method-not-found denial before missing, null, object, string, numeric or
+      hostile-array parameters can be read or coerced. It also covers aliases,
+      zero profile/config/key/packet/relay effects, immutable per-instance
+      policy, startup derivation and positive unmanaged address/import/export/
+      proof/raw-create/input-signing compatibility. Java 21 focused
+      compatibility tests passed 36/36 and the complete suite passed 89/89
+      with zero failures, errors or skips.
 - [ ] **XL-IS-T11** - Run Java 21 focused/full/hostile/crash tests, inspect all
       OpenRewrite drift, produce two byte-identical shaded JARs and close exact
       dependency/licence/provenance/SBOM/source identities.

@@ -197,6 +197,8 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         if (request != null) {
             String content = request.content().toString(CharsetUtil.UTF_8);
             JsonObject jsonReq = null;
+            String method = null;
+            boolean managedSensitiveMethod = false;
 
             try {
                 jsonReq = JsonParser.parseString(content).getAsJsonObject();
@@ -205,9 +207,15 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
                 if (!jsonReq.has("method")
                         || !jsonReq.get("method").isJsonPrimitive()
-                        || !jsonReq.getAsJsonPrimitive("method").isString()
-                        || !jsonReq.has("params")
-                        || !jsonReq.get("params").isJsonArray()) {
+                        || !jsonReq.getAsJsonPrimitive("method").isString()) {
+                    throw new IllegalArgumentException("Bad JSON-RPC request by client.");
+                }
+
+                method = jsonReq.get("method").getAsString();
+                managedSensitiveMethod = isManagedSensitiveMethod(method);
+
+                if (!managedSensitiveMethod
+                        && (!jsonReq.has("params") || !jsonReq.get("params").isJsonArray())) {
                     throw new IllegalArgumentException("Bad JSON-RPC request by client.");
                 }
             } catch (Exception e) {
@@ -229,13 +237,16 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             if (status == HttpResponseStatus.OK) {
                 Preconditions.checkNotNull(jsonReq);
-
-                String method = jsonReq.get("method").getAsString();
-                JsonArray params = jsonReq.get("params").getAsJsonArray();
+                Preconditions.checkNotNull(method);
 
                 LOGGER.log(Level.INFO, "[http-server-handler] RPC request received.");
 
-                response = getResponse(method, params);
+                if (managedSensitiveMethod) {
+                    response = managedMethodUnavailable();
+                } else {
+                    JsonArray params = jsonReq.get("params").getAsJsonArray();
+                    response = getResponse(method, params);
+                }
             } else {
                 ByteBuf responseContent = Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8);
                 FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.protocolVersion(), status, responseContent);
@@ -258,14 +269,12 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private JsonObject getResponse(String method, JsonArray params) {
-        JsonObject response = new JsonObject();
         String normalisedMethod = method.toLowerCase(Locale.ROOT);
 
-        if (coin.isManagedReadOnlyExistingProfile()
-                && MANAGED_SENSITIVE_METHODS.contains(normalisedMethod)) {
-            setRpcError(response, -32601, "Method not found.");
-            return response;
-        }
+        if (isManagedSensitiveMethod(normalisedMethod))
+            return managedMethodUnavailable();
+
+        JsonObject response = new JsonObject();
 
         switch (normalisedMethod) {
             case "reloadconfig": {
@@ -1629,6 +1638,17 @@ public class HTTPServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         if (exponentText.length() < 2)
             exponentText = "0" + exponentText;
         return mantissa.toPlainString() + "e" + (exponent >= 0 ? "+" : "-") + exponentText;
+    }
+
+    private boolean isManagedSensitiveMethod(String method) {
+        return coin.isManagedReadOnlyExistingProfile()
+                && MANAGED_SENSITIVE_METHODS.contains(method.toLowerCase(Locale.ROOT));
+    }
+
+    private static JsonObject managedMethodUnavailable() {
+        JsonObject response = new JsonObject();
+        setRpcError(response, -32601, "Method not found.");
+        return response;
     }
 
     private static void setRpcError(JsonObject response, int code, String message) {

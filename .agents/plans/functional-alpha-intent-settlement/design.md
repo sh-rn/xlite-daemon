@@ -221,8 +221,10 @@ instance policy, not a mutable global mode. Existing-profile address derivation
 uses a private same-thread initialisation authority that cannot be invoked by an
 RPC/helper caller after startup.
 
-The ordinary coin handler rejects sensitive method names before inspecting
-their parameters. The inventory includes generic raw construction/sign/send,
+The ordinary coin handler extracts and normalises a valid method name, then
+rejects a managed sensitive name before reading, validating or coercing the
+`params` member. The same constant denial is retained inside dispatch as a
+defence in depth. The inventory includes generic raw construction/sign/send,
 address creation, key import/export, mnemonic export, arbitrary message signing,
 transfer/send aliases and XRouter send. Direct transaction-signing, private-key
 import/address-generation and raw-relay helpers enforce the same instance

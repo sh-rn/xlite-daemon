@@ -9,6 +9,16 @@ import io.cloudchains.app.util.AddressBalance;
 import io.cloudchains.app.util.ConfigHelper;
 import io.cloudchains.app.util.UTXO;
 import io.cloudchains.app.wallet.WalletHelper;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.ReferenceCountUtil;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Transaction;
 import org.junit.jupiter.api.AfterEach;
@@ -19,8 +29,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -116,6 +128,78 @@ class ManagedReadOnlyAuthorityBoundaryTest {
         verify(config, never()).loadConfig();
         verify(address, never()).getPrivateKey();
         verifyNoInteractions(relay);
+        assertProfileEquals(fixture.profileBeforeManagedStart());
+    }
+
+    @Test
+    void managedHttpDenialPrecedesEveryParameterShapeAndEffect() throws Exception {
+        ManagedFixture fixture = startManagedCoinWithOnePersistedAddress();
+        coin = fixture.coin();
+        AddressBalance address = spy(coin.getAddressKeyPairs().get(0));
+        replaceFirstAddress(coin, address);
+        ConfigHelper config = spy(coin.getConfigHelper());
+        setField(coin, "configHelper", config);
+        XRouterPacketManager packetManager = mock(XRouterPacketManager.class);
+        setField(coin, "xRouterPacketManager", packetManager);
+
+        String method = "SiGnRaWtRaNsAcTiOn";
+        JsonObject missing = requestWithMethod(method);
+
+        JsonObject explicitNull = requestWithMethod(method);
+        explicitNull.add("params", JsonNull.INSTANCE);
+
+        JsonObject object = requestWithMethod(method);
+        JsonObject objectParams = new JsonObject();
+        objectParams.addProperty("privateKey", fixture.privateKey());
+        objectParams.addProperty("address", address.getAddress().toBase58());
+        object.add("params", objectParams);
+
+        JsonObject scalar = requestWithMethod(method);
+        scalar.addProperty("params", fixture.privateKey());
+
+        JsonObject numericScalar = requestWithMethod(method);
+        numericScalar.addProperty("params", 42);
+
+        JsonObject hostileArray = requestWithMethod(method);
+        JsonArray arrayParams = new JsonArray();
+        JsonObject nestedSecret = new JsonObject();
+        nestedSecret.addProperty("privateKey", fixture.privateKey());
+        JsonArray nested = new JsonArray();
+        nested.add(nestedSecret);
+        arrayParams.add(nested);
+        arrayParams.add(JsonNull.INSTANCE);
+        hostileArray.add("params", arrayParams);
+
+        JsonObject[] requests = {
+                missing, explicitNull, object, scalar, numericScalar, hostileArray
+        };
+        byte[] expectedBody = null;
+        for (JsonObject jsonRequest : requests) {
+            HTTPClient relay = mock(HTTPClient.class);
+            Object handler = createHandler(coin, relay);
+            HttpRpcResponse httpResponse = invokeHttp(
+                    handler, relay, coin, jsonRequest.toString());
+
+            assertEquals(HttpResponseStatus.OK, httpResponse.status());
+            if (expectedBody == null)
+                expectedBody = httpResponse.body();
+            else
+                assertArrayEquals(expectedBody, httpResponse.body());
+
+            String responseText = new String(httpResponse.body(), StandardCharsets.UTF_8);
+            assertMethodNotFound(com.google.gson.JsonParser.parseString(responseText)
+                    .getAsJsonObject());
+            assertFalse(responseText.contains(fixture.privateKey()));
+            assertFalse(responseText.contains(address.getAddress().toBase58()));
+        }
+
+        assertNotNull(expectedBody);
+        assertEquals(1, coin.getAddressKeyPairs().size());
+        assertEquals(1, config.getAddressCount());
+        verify(config, never()).writeConfig();
+        verify(config, never()).loadConfig();
+        verify(address, never()).getPrivateKey();
+        verifyNoInteractions(packetManager);
         assertProfileEquals(fixture.profileBeforeManagedStart());
     }
 
@@ -288,6 +372,56 @@ class ManagedReadOnlyAuthorityBoundaryTest {
         return (JsonObject) getResponse.invoke(handler, method, params);
     }
 
+    private static JsonObject requestWithMethod(String method) {
+        JsonObject request = new JsonObject();
+        request.addProperty("method", method);
+        return request;
+    }
+
+    private static HttpRpcResponse invokeHttp(Object handler, HTTPClient relay,
+                                              CoinInstance target, String json) {
+        EmbeddedChannel channel = new EmbeddedChannel((ChannelHandler) handler);
+        try {
+            byte[] requestBytes = json.getBytes(StandardCharsets.UTF_8);
+            DefaultFullHttpRequest request = new DefaultFullHttpRequest(
+                    HttpVersion.HTTP_1_1, HttpMethod.POST, "/",
+                    Unpooled.wrappedBuffer(requestBytes));
+            request.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, requestBytes.length);
+            String credentials = target.getConfigHelper().getRpcUsername() + ":"
+                    + target.getConfigHelper().getRpcPassword();
+            credentials = Base64.getEncoder().encodeToString(
+                    credentials.getBytes(StandardCharsets.UTF_8));
+            request.headers().set(HttpHeaderNames.AUTHORIZATION, "Basic " + credentials);
+
+            channel.writeInbound(request);
+            FullHttpResponse response = null;
+            Object outbound;
+            while ((outbound = channel.readOutbound()) != null) {
+                if (response == null && outbound instanceof FullHttpResponse fullResponse) {
+                    response = fullResponse;
+                } else {
+                    ReferenceCountUtil.release(outbound);
+                }
+            }
+            assertNotNull(response);
+            byte[] body = new byte[response.content().readableBytes()];
+            response.content().getBytes(response.content().readerIndex(), body);
+            HttpResponseStatus status = response.status();
+            ReferenceCountUtil.release(response);
+            assertNoRelayEffects(relay);
+            return new HttpRpcResponse(status, body);
+        } finally {
+            channel.finishAndReleaseAll();
+            assertNoRelayEffects(relay);
+        }
+    }
+
+    private static void assertNoRelayEffects(HTTPClient relay) {
+        assertTrue(mockingDetails(relay).getInvocations().stream()
+                        .allMatch(invocation -> invocation.getMethod().getName().equals("close")),
+                mockingDetails(relay).getInvocations().toString());
+    }
+
     @SuppressWarnings("unchecked")
     private static void replaceFirstAddress(CoinInstance target, AddressBalance replacement)
             throws Exception {
@@ -347,5 +481,8 @@ class ManagedReadOnlyAuthorityBoundaryTest {
 
     private record UnmanagedFixture(CoinInstance coin, AddressBalance address,
                                     String privateKey) {
+    }
+
+    private record HttpRpcResponse(HttpResponseStatus status, byte[] body) {
     }
 }
