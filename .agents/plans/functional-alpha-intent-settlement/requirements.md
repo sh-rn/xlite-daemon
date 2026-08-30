@@ -99,3 +99,29 @@ Status: T10 denial independently accepted - named settlement requirements remain
   credential/transport boundary, remote action and alternate route. Narrative
   or unnamed nested/status-specific body fields are not a closed schema and
   block source rather than permitting an implementation choice.
+- **XL-IS-022** - The T04 successor must bind IS-SEQ-005 with closed Java
+  request/result sums, status-specific quarantine/broadcast bodies, bounded
+  decimal/address/base64 validators, always-present nullable error identity,
+  typed validated-request error context, reserved error rejection,
+  result-digest recomputation/vector and every
+  explicit cardinality/cross-field rule. Its inert test store must freeze the
+  operation append, profile-initialisation, generation-handover, binary frame,
+  HMAC-chain and prepared-startup-quarantine formats without adding a listener,
+  production key, wallet, chain or effect path. Raw inert limits are validated
+  only by both checked factories: out-of-range is invalid limits, while valid
+  but undersized is capacity unavailable.
+- **XL-IS-023** - `checkOwnedAddress` uses exactly the corrected IS-SEQ-006
+  12-key wire envelope with parent/child/role/stage absent, while its identity
+  builders inject four empty values only in the semantic/payload preimages.
+  Contextual effects and lookup use exact 16-key envelopes; lookup context is
+  present-empty only for an ownership-probe target. Every mixed shape denies.
+- **XL-IS-024** - Every inert operation append authenticates the full durable
+  target context needed for corrected lookup equality. Lookup validates the
+  current generation separately, compares that context with the selected
+  record and returns stored older-generation result bytes unchanged. Stale
+  generation and target-context mismatch are distinct non-mutating holds. Any
+  normal write/force failure permanently poisons the instance and immediately
+  releases the lock, closes the channel and zeroes the key; all later
+  operations hold, the first close reports poison, and no repair, retry or
+  redispatch occurs. A normal close likewise makes every later operation hold
+  without file access and makes every later close a no-op.

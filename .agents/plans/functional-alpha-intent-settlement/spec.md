@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation proposal
 
-Status: T10 denial prerequisite independently accepted - settlement and runtime remain held
+Status: T10 and Desktop T36 accepted - T04 successor review open
 
 ## Outcome
 
@@ -29,7 +29,16 @@ The independently accepted denial-only source head is
 `71b5f33fc8931918bcc40f002b4ff6726a13316e`. The exact T04 future-source
 dossier is
 [`docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md`](../../../docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md).
-It remains a review draft and authorises no source.
+Its independently accepted fail-closed predecessor is
+`a3be3230842fcfcb3d90dda8bf7192e9e4374119`, tree
+`1aea08c4ff07cfc9b771888806ee8f9099cd428f`. The current successor draft binds
+Desktop IS-SEQ-005 commit
+`eefc250aec9674e2233028a14f343ec5b045752c`, tree
+`8c5d62a88c04cc2e0d5ffa2d9abab7a12284d2ce`, normative IS-SEQ-006
+`3d7c630af300c5d4234fd3e3ac29e1e2f4c64b3b`, and corrected Desktop head
+`023838583a735deb5b81151338f7a79c8d37aa54`, tree
+`d39afdc05057f5facec42869534c324dc349228f`. Final T36 acceptance is
+`12a915e458427f94c1a223695a21c70043d0cc57`. It authorises no source.
 
 The repository standing authority permits this proposal and later normal
 delivery work in `sh-rn/xlite-daemon`. It does not make an unreviewed interface,
@@ -107,7 +116,9 @@ claim that a request is authorised is never sufficient by itself.
 - Additional assets, testnet, public Beta, existing-profile adoption or a
   general sweep/exit operation.
 - Core source mutation, Desktop recovery implementation, signing, packaging,
-  notarisation, release, push, merge, tag or remote publication in this tranche.
+  notarisation, release, merge, tag or artefact publication in this tranche.
+  A normal push of an independently accepted docs-only dossier commit to the
+  authorised XLite fork branch is the only expected remote action.
 
 ## Sequenced denial prerequisite XL-IS-SEQ-001
 
@@ -126,11 +137,13 @@ wiring. T10 is checked only because the complete inventory and Java 21 focused
 and relevant full tests passed; its evidence is recorded in `tasks.md`.
 T02/T03/T05-T09 and all runtime/funds gates remain held.
 
-The T04 review also found that IS-SEQ-004's statement that the proposal body
-shapes are adopted is not enough to implement a closed parser where the
-proposal gives only narrative, unnamed nested or status-specific fields. Those
-exact schema gaps must be resolved by an additive joint contract before parser
-source can be authorised.
+The T04 review found that IS-SEQ-004's narrative body adoption was not a closed
+schema. Desktop IS-SEQ-005 freezes those ten nested/status/result-identity gaps
+and independently reproduces the result vector. Corrected IS-SEQ-006 freezes
+the 12-key ownership probe, 16-key contextual/lookup variants, preimage-only
+empty context, parser totals and stateless-codec versus store-transition rules.
+Exact Java source remains held because this successor dossier still requires
+independent exact-commit review and joint T33/T35 source-only permission.
 
 ## Dependency hold
 

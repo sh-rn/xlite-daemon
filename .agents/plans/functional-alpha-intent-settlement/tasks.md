@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation tasks
 
-Status: T10 denial prerequisite independently accepted - T04 review draft open
+Status: T10 and Desktop T36 accepted - T04 successor review open
 
 `XL-IS-SEQ-001` authorises only T10 ahead of T02/T03/T07. Independent review
 subject: `9bfc85d6e7aee1dbf99943ed113575a6805a3ddd`; reviewer:
@@ -23,11 +23,20 @@ Every other task remains held.
       base/head/tree, branch, every existing/new file, class/method, dependency,
       test, build command, expected remote action and complete bypass inventory.
       Obtain exact independent review before source work.
-      Draft evidence: `docs/protocols/functional-alpha-intent-settlement-
-      mutation-manifest.md` pins the exact proposed add-only source surface and
-      all hold boundaries. It remains unchecked because it has not received
-      independent exact-commit review and because the joint contract still
-      lacks several exact nested/status-specific body shapes.
+      Draft evidence: [source-only mutation manifest](../../../docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md).
+      Predecessor commit
+      `a3be3230842fcfcb3d90dda8bf7192e9e4374119`, tree
+      `1aea08c4ff07cfc9b771888806ee8f9099cd428f`, independently passed as a
+      truthful fail-closed dossier record. The successor binds Desktop
+      IS-SEQ-005 `eefc250aec9674e2233028a14f343ec5b045752c`, closes its ten
+      nested/status/result-identity gaps and pins the exact proposed add-only
+      Java surface. Corrected IS-SEQ-006 head
+      `023838583a735deb5b81151338f7a79c8d37aa54`, tree
+      `d39afdc05057f5facec42869534c324dc349228f`, and final T36 acceptance
+      `12a915e458427f94c1a223695a21c70043d0cc57` close the top-level wire,
+      parser-budget and codec/store attribution gaps. T04 remains unchecked
+      pending independent review of this exact successor commit. No source is
+      authorised until separate joint T33/T35 acceptance.
 - [ ] **XL-IS-T05** - Implement only the reviewed value-free launch selector,
       private authenticated transport and closed schema parsing. Keep the
       capability unavailable without admitted policy/store/executor components.

@@ -1,6 +1,6 @@
 # Functional Alpha XLite intent-settlement remediation design
 
-Status: T10 denial independently accepted - named settlement design remains proposed
+Status: T10 and Desktop T36 accepted - T04 successor review open
 
 ## Ownership and transport
 
@@ -58,9 +58,11 @@ Successful replies use schema `blocknet.xlite.settlement.result.v1` and contain
 exactly `schema`, `operation`, `semanticOperationId`, `payloadDigest`, `status`,
 `resultDigest`, `recordedAtUnixMillis` and the closed operation-specific `body`.
 Denied replies use schema `blocknet.xlite.settlement.error.v1` and contain
-exactly `schema`, `operation`, optional `semanticOperationId`, `code`,
-`quarantined` and `recordedAtUnixMillis`. No free-form upstream message crosses
-the boundary.
+exactly `schema`, `operation`, always-present nullable `semanticOperationId`,
+`code`, `quarantined` and `recordedAtUnixMillis`. The semantic ID is JSON null
+only for invalid/unauthenticated requests; three backend outcome codes are
+reserved from error envelopes. No free-form upstream message crosses the
+boundary.
 
 `checkOwnedAddress` uses a smaller connector context because the reviewed Core
 probe can precede an order: schema, operation, profile, generation, semantic
@@ -242,8 +244,19 @@ test, build, transport, credential and bypass inventory is recorded in
 [`functional-alpha-intent-settlement-mutation-manifest.md`](../../../docs/protocols/functional-alpha-intent-settlement-mutation-manifest.md).
 It changes no source and leaves T04 unchecked pending independent review.
 
-IS-SEQ-004 calls the proposal's operation-specific body fields adopted closed
-parser shapes. That statement is insufficient where the immutable proposal
-does not actually enumerate nested keys or status-specific result bodies. The
-dossier identifies each missing exact shape as a hard pre-code blocker. No
+IS-SEQ-005 closes the predecessor dossier's ten nested/status/result-identity
+gaps. The successor now freezes closed Java request/result sums, typed scalar
+validators, result-digest vector, exact operation append transitions and an
+inert authenticated frame/state machine with synthetic keys only. Every inert
+operation frame authenticates the full selected-target context; lookup checks
+current generation separately and returns stored older-generation bytes. A
+write/force failure immediately poisons and cleans up the instance. A newly
+identified contradiction is closed by corrected IS-SEQ-006: a regular
+`checkOwnedAddress` request has 12 keys and omits four context members, while
+only its identity preimages inject four empty values; contextual effects and
+lookup use their exact 16-key variants. The successor binds the corrected
+Desktop head `023838583a735deb5b81151338f7a79c8d37aa54`, tree
+`d39afdc05057f5facec42869534c324dc349228f`, and final T36 acceptance
+`12a915e458427f94c1a223695a21c70043d0cc57`. Only dossier review and joint
+T33/T35 source permission remain before the proposed source-only tranche. No
 generic body, inferred name or implementation-selected value is permitted.
